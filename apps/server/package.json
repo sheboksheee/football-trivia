@@ -1,0 +1,28 @@
+{
+  "name": "@ft/server",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/main.ts",
+    "start": "node dist/main.js",
+    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/main.js --packages=external --sourcemap && esbuild src/migrate.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/migrate.js --packages=external",
+    "typecheck": "tsc -p tsconfig.json",
+    "db:migrate": "tsx src/migrate.ts"
+  },
+  "dependencies": {
+    "@ft/content": "workspace:*",
+    "@ft/game-rules": "workspace:*",
+    "@ft/shared": "workspace:*",
+    "pg": "^8.16.3",
+    "pino": "^10.1.0",
+    "ws": "^8.18.3",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.6",
+    "@types/ws": "^8.18.1",
+    "esbuild": "^0.25.11",
+    "tsx": "^4.20.6"
+  }
+}

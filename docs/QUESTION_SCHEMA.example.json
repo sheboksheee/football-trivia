@@ -1,0 +1,12 @@
+{
+  "id": "uuid",
+  "mode": "higher_or_lower",
+  "status": "CANDIDATE",
+  "locale": "ar-EG",
+  "difficulty": {"estimated": "medium", "calibrated": null},
+  "facts": [{"entity_id": "player-123", "field": "goals", "value": 10, "scope": "competition+season", "source_id": "provider-1", "evidence_id": "evidence-123"}],
+  "verification": {"status": "PENDING", "reviewer_id": null, "verified_at": null},
+  "rights": {"usage_status": "PENDING_REVIEW"},
+  "exposure": {"last_used_at": null, "total_plays": 0},
+  "version": 1
+}
