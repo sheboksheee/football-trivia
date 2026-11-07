@@ -55,7 +55,11 @@ export async function createApp(
   await db.init();
   if (db.kind === 'memory')
     log.warn('DATABASE_URL not set: using in-memory storage (development only, nothing persists)');
-  const strict = config.CONTENT_POLICY ? config.CONTENT_POLICY === 'STRICT' : config.production;
+  const strict = config.CONTENT_POLICY
+    ? config.CONTENT_POLICY === 'STRICT'
+    : config.production && !config.DEMO_MODE;
+  if (config.DEMO_MODE)
+    log.warn('DEMO_MODE: in-memory rooms and the fictional development question bank. Not for real events.');
   const content = new ContentService(db, log, strict);
   await content.init();
   const timing =

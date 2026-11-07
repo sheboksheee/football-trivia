@@ -56,7 +56,7 @@ pnpm build
 NODE_ENV=production DATABASE_URL=... SESSION_SECRET=$(openssl rand -hex 32) ADMIN_TOKEN=... \
   WEB_DIST=apps/web/dist node apps/server/dist/main.js
 ```
-Production refuses to start without `SESSION_SECRET` and `DATABASE_URL`, and uses the **STRICT** content policy: nothing is auto-published, every question needs human approval in the Content Studio. A `Dockerfile` is provided. Put TLS (wss) in front via your load balancer. See `docs/BUILD_STATUS.md` for the launch blockers that remain.
+Production refuses to start without `SESSION_SECRET` and `DATABASE_URL` (unless `DEMO_MODE=true`, used by the one-click Render demo: in-memory rooms + fictional question bank), and uses the **STRICT** content policy: nothing is auto-published, every question needs human approval in the Content Studio. A `Dockerfile` is provided. Put TLS (wss) in front via your load balancer. See `docs/BUILD_STATUS.md` for the launch blockers that remain.
 
 ## Key rules (approved)
 Match Night placement 1st 5 · 2nd 3 · 3rd 1 · 4th+ 0, shared places split exactly (e.g. 4/3). Ladder: points → sole 1sts → sole 2nds → sole 3rds → up to five 15s tie-break questions → shared champions. 15s appeal window, 30s reconnect grace without extra answer time, host pause between questions, emergency pause with logged reason, everything server-authoritative.

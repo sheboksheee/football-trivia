@@ -11,6 +11,8 @@ services:
     envVars:
       - key: NODE_VERSION
         value: '22'
+      - key: DEMO_MODE
+        value: 'true'
       - key: WEB_DIST
         value: apps/web/dist
       - key: SESSION_SECRET
