@@ -12,7 +12,8 @@
   "dependencies": {
     "@ft/shared": "workspace:*",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0"
+    "react-dom": "^19.2.0",
+    "@ft/game-rules": "workspace:*"
   },
   "devDependencies": {
     "@testing-library/react": "^16.3.0",

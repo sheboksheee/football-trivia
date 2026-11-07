@@ -10,7 +10,7 @@ import {
 import type { Persistence } from './persistence.js';
 import type { ContentService } from './contentService.js';
 import type { Logger } from './logger.js';
-import { KeyedLimiter, TokenBucket } from './rateLimit.js';
+import { KeyedLimiter, type TokenBucket } from './rateLimit.js';
 import type { Metrics } from './metrics.js';
 
 export interface Conn {

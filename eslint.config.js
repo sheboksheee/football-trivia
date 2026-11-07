@@ -17,6 +17,11 @@ export default tseslint.config(
     },
   },
   {
+    // Tests inspect untyped server projections and wire messages.
+    files: ['**/test/**/*.{ts,tsx}', 'tests/**/*.ts'],
+    rules: { '@typescript-eslint/no-explicit-any': 'off' },
+  },
+  {
     files: ['apps/web/**/*.{ts,tsx}'],
     plugins: { 'react-hooks': reactHooks },
     rules: {

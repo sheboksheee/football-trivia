@@ -37,9 +37,9 @@ async function lobby(n: number, extra: Array<'SPECTATOR' | 'JUDGE'> = []) {
 
 describe('server integration over WebSocket', () => {
   it('health, metrics and modes endpoints', async () => {
-    const h = await (await fetch(`http://127.0.0.1:${port}/healthz`)).json();
+    const h = (await (await fetch(`http://127.0.0.1:${port}/healthz`)).json()) as any;
     expect(h.ok).toBe(true);
-    const modes = await (await fetch(`http://127.0.0.1:${port}/api/modes`)).json();
+    const modes = (await (await fetch(`http://127.0.0.1:${port}/api/modes`)).json()) as any;
     expect(modes.modes).toHaveLength(12);
     expect(modes.playable).not.toContain('who_am_i');
     expect(modes.availability.higher_lower.published).toBeGreaterThan(5);
@@ -145,15 +145,15 @@ describe('server integration over WebSocket', () => {
     const base = `http://127.0.0.1:${port}/api/admin`;
     expect((await fetch(`${base}/summary`)).status).toBe(401);
     const auth = { authorization: 'Bearer test-admin-token', 'content-type': 'application/json' };
-    const list = await (await fetch(`${base}/questions?status=BLOCKED_RIGHTS`, { headers: auth })).json();
+    const list = (await (await fetch(`${base}/questions?status=BLOCKED_RIGHTS`, { headers: auth })).json()) as any;
     expect(list.total).toBeGreaterThan(0);
     const id = list.items[0].id;
-    const detail = await (await fetch(`${base}/questions/${id}`, { headers: auth })).json();
+    const detail = (await (await fetch(`${base}/questions/${id}`, { headers: auth })).json()) as any;
     expect(detail.facts[0].evidence.hash).toMatch(/^[0-9a-f]{64}$/);
     const r = await fetch(`${base}/questions/${id}/review`, { method: 'POST', headers: auth, body: JSON.stringify({ action: 'APPROVE', note: 'try to force' }) });
     expect(r.status).toBe(409);
-    const pub = (await (await fetch(`${base}/questions?status=PUBLISHED&kind=mcq&limit=1`, { headers: auth })).json()).items[0].id;
+    const pub = ((await (await fetch(`${base}/questions?status=PUBLISHED&kind=mcq&limit=1`, { headers: auth })).json()) as any).items[0].id;
     const retire = await fetch(`${base}/questions/${pub}/review`, { method: 'POST', headers: auth, body: JSON.stringify({ action: 'RETIRE', note: 'outdated wording' }) });
-    expect((await retire.json()).question.status).toBe('RETIRED');
+    expect(((await retire.json()) as any).question.status).toBe('RETIRED');
   });
 });

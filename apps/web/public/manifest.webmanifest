@@ -1,0 +1,13 @@
+{
+  "name": "Football Trivia",
+  "short_name": "Football Trivia",
+  "description": "Multiplayer football knowledge party game",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0B1016",
+  "theme_color": "#0B1016",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}

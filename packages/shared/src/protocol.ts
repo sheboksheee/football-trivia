@@ -14,6 +14,7 @@ export const DisplayName = z
   .trim()
   .min(1, 'Name required')
   .max(24, 'Max 24 characters')
+  // eslint-disable-next-line no-control-regex -- rejecting control characters is the point
   .refine((s) => !/[\u0000-\u001f<>]/.test(s), 'Invalid characters');
 
 export const ModeKeySchema = z.enum(MODE_KEYS);

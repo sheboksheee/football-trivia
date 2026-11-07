@@ -47,7 +47,7 @@ export class TestClient {
     if (this.view && pred(this.view)) return Promise.resolve(this.view);
     return this.wait((m) => m.t === 'state' && pred(m.view), timeout).then((m) => m.view);
   }
-  async send(command: unknown, id = randomUUID(), extra: Record<string, unknown> = {}) {
+  async send(command: unknown, id: string = randomUUID(), extra: Record<string, unknown> = {}) {
     this.ws.send(JSON.stringify({ id, command, ...extra }));
     return this.wait((m) => m.t === 'ack' && m.id === id);
   }

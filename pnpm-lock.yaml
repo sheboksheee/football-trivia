@@ -78,6 +78,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@ft/game-rules':
+        specifier: workspace:*
+        version: link:../../packages/game-rules
       '@ft/shared':
         specifier: workspace:*
         version: link:../../packages/shared
