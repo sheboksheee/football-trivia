@@ -193,7 +193,8 @@ export const MODES: Record<ModeKey, ModeInfo> = {
     number: 9,
     name: { en: 'Risk It', ar: 'خاطر بها' },
     concept: 'Choose a risk level before a four-option question.',
-    rules: '6 turns each. 10s risk selection, 15s answer. SAFE +1/0, BOLD +3/−1, ALL IN +6/−3. Negatives allowed.',
+    rules:
+      '6 turns each. 10s risk selection, 15s answer. SAFE +1/0, BOLD +3/−1, ALL IN +6/−3. Negatives allowed.',
     minPlayers: 2,
     maxPlayers: 6,
     judge: 'none',
@@ -225,7 +226,8 @@ export const MODES: Record<ModeKey, ModeInfo> = {
     number: 11,
     name: { en: 'Guess the Match', ar: 'خمّن المباراة' },
     concept: 'Identify a historic fixture from four real matches and three clues.',
-    rules: '8 matches, 30s each. Clues at 0/10/20s. Correct +5/+3/+1 by clue tier; one confirmed answer; wrong 0; no speed bonus.',
+    rules:
+      '8 matches, 30s each. Clues at 0/10/20s. Correct +5/+3/+1 by clue tier; one confirmed answer; wrong 0; no speed bonus.',
     minPlayers: 2,
     maxPlayers: 6,
     judge: 'none',

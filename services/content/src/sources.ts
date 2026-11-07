@@ -20,7 +20,8 @@ export const SOURCES: SourceRecord[] = [
     termsUrl: null,
     autoApproveEligible: true,
     integrated: true,
-    notes: 'Project-authored, deterministic, entirely fictional clubs/players/matches. Not real football facts.',
+    notes:
+      'Project-authored, deterministic, entirely fictional clubs/players/matches. Not real football facts.',
   },
   {
     id: CROSSCHECK_SOURCE_ID,
@@ -32,7 +33,8 @@ export const SOURCES: SourceRecord[] = [
     termsUrl: null,
     autoApproveEligible: true,
     integrated: true,
-    notes: 'Second fictional feed re-reporting a sample of season stats, with deliberate disagreements to exercise conflict quarantine.',
+    notes:
+      'Second fictional feed re-reporting a sample of season stats, with deliberate disagreements to exercise conflict quarantine.',
   },
   {
     id: PENDING_SOURCE_ID,
@@ -49,28 +51,42 @@ export const SOURCES: SourceRecord[] = [
   ...(
     [
       ['src_cand_sportmonks', 'Sportmonks Football API', 'LICENSED_API', 'https://www.sportmonks.com/'],
-      ['src_cand_football_data_org', 'football-data.org v4', 'LICENSED_API', 'https://www.football-data.org/'],
+      [
+        'src_cand_football_data_org',
+        'football-data.org v4',
+        'LICENSED_API',
+        'https://www.football-data.org/',
+      ],
       ['src_cand_api_football', 'API-Football (API-SPORTS)', 'LICENSED_API', 'https://www.api-football.com/'],
       ['src_cand_sportradar', 'Sportradar Soccer API', 'LICENSED_API', 'https://sportradar.com/'],
       ['src_cand_statsperform', 'Stats Perform / Opta', 'LICENSED_API', 'https://www.statsperform.com/'],
-      ['src_cand_statsbomb_open', 'StatsBomb Open Data', 'OPEN_DATASET', 'https://github.com/statsbomb/open-data'],
-      ['src_cand_openfootball', 'OpenFootball football.json', 'OPEN_DATASET', 'https://github.com/openfootball/football.json'],
+      [
+        'src_cand_statsbomb_open',
+        'StatsBomb Open Data',
+        'OPEN_DATASET',
+        'https://github.com/statsbomb/open-data',
+      ],
+      [
+        'src_cand_openfootball',
+        'OpenFootball football.json',
+        'OPEN_DATASET',
+        'https://github.com/openfootball/football.json',
+      ],
       ['src_cand_wikidata', 'Wikidata (identity & aliases)', 'OPEN_DATASET', 'https://www.wikidata.org/'],
     ] as const
-  ).map(
-    ([id, name, kind, url]): SourceRecord => ({
-      id,
-      name,
-      kind,
-      licenseStatus: 'PENDING',
-      allowedUses: [],
-      attribution: name,
-      termsUrl: url,
-      autoApproveEligible: false,
-      integrated: false,
-      notes: 'Candidate only. Verify coverage, terms, commercial redistribution rights and pricing before integration.',
-    }),
-  ),
+  ).map(([id, name, kind, url]): SourceRecord => ({
+    id,
+    name,
+    kind,
+    licenseStatus: 'PENDING',
+    allowedUses: [],
+    attribution: name,
+    termsUrl: url,
+    autoApproveEligible: false,
+    integrated: false,
+    notes:
+      'Candidate only. Verify coverage, terms, commercial redistribution rights and pricing before integration.',
+  })),
 ];
 
 export function sourceById(id: string): SourceRecord | undefined {

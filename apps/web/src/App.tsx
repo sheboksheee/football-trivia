@@ -43,7 +43,10 @@ export function App() {
       /* ignore */
     }
   }, [locale]);
-  const i18n = useMemo(() => ({ locale, setLocale, t: (k: keyof (typeof DICTS)['en']) => DICTS[locale][k] }), [locale]);
+  const i18n = useMemo(
+    () => ({ locale, setLocale, t: (k: keyof (typeof DICTS)['en']) => DICTS[locale][k] }),
+    [locale],
+  );
   const parts = hash.replace(/^#\/?/, '').split('/');
   let page;
   switch (parts[0]) {
@@ -67,16 +70,24 @@ export function App() {
   }
   return (
     <I18nContext.Provider value={i18n}>
-      <a href="#main" className="sr-only">Skip to content</a>
+      <a href="#main" className="sr-only">
+        Skip to content
+      </a>
       <div className="shell">
         <header className="topbar">
           <button className="brand" onClick={() => go('#/')} aria-label="Football Trivia home">
-            <span className="brand-mark" aria-hidden="true">FT</span>
+            <span className="brand-mark" aria-hidden="true">
+              FT
+            </span>
             <span>{i18n.t('appName')}</span>
           </button>
           <span className="spacer" />
           <ConnectionBadge />
-          <button className="btn ghost sm" onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')} lang={locale === 'en' ? 'ar' : 'en'}>
+          <button
+            className="btn ghost sm"
+            onClick={() => setLocale(locale === 'en' ? 'ar' : 'en')}
+            lang={locale === 'en' ? 'ar' : 'en'}
+          >
             {i18n.t('language')}
           </button>
         </header>

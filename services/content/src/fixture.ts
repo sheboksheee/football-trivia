@@ -12,42 +12,196 @@ export const FIXTURE_SEASONS = Array.from({ length: 10 }, (_, i) => 2001 + i);
 export const FIXTURE_COMPETITION = 'Synthetic Dev League';
 const CUTOFF = '2010-06-30';
 
-const TOWNS = ['Northbridge', 'Eastvale', 'Corrow', 'Hallmere', 'Westlyn', 'Brackenford', 'Sundale', 'Kestrel Bay', 'Aldermoor', 'Ravensholt'];
-const SUFFIX = ['Athletic', 'Rovers', 'FC', 'Town', 'Albion', 'Wanderers', 'City', 'Harriers', 'FC', 'Rangers'];
+const TOWNS = [
+  'Northbridge',
+  'Eastvale',
+  'Corrow',
+  'Hallmere',
+  'Westlyn',
+  'Brackenford',
+  'Sundale',
+  'Kestrel Bay',
+  'Aldermoor',
+  'Ravensholt',
+];
+const SUFFIX = [
+  'Athletic',
+  'Rovers',
+  'FC',
+  'Town',
+  'Albion',
+  'Wanderers',
+  'City',
+  'Harriers',
+  'FC',
+  'Rangers',
+];
 const GROUNDS = ['Park', 'Lane', 'Meadow', 'Road', 'Arena', 'Field', 'Ground', 'Stadium', 'Common', 'Grove'];
 const COUNTRIES = ['Valdoria', 'Estmark', 'Coravia', 'Norland', 'Siravel', 'Pellany'];
-const FIRST = ['Aren', 'Bastio', 'Cael', 'Dorin', 'Elio', 'Fenn', 'Garo', 'Hale', 'Ivo', 'Jory', 'Kasimir', 'Lio', 'Marek', 'Nilo', 'Orin', 'Pell', 'Quin', 'Rafe', 'Soren', 'Tavi', 'Ulric', 'Vero', 'Wren', 'Yannick', 'Zev', 'Teodor', 'Matti', 'Emrys', 'Corvin', 'Silas'];
-const LAST_A = ['Var', 'Hol', 'Mer', 'Dra', 'Kel', 'Sto', 'Bri', 'Lan', 'Tor', 'Fen', 'Gal', 'Ost', 'Ren', 'Wil', 'Asc', 'Pim', 'Cor', 'Del', 'Mar', 'Nov'];
-const LAST_B = ['denne', 'ström', 'achi', 'ovic', 'ley', 'brand', 'mont', 'eiro', 'stad', 'quist', 'avan', 'ford', 'ini', 'berg', 'ado', 'rell', 'unza', 'holt', 'ezio', 'kaar'];
+const FIRST = [
+  'Aren',
+  'Bastio',
+  'Cael',
+  'Dorin',
+  'Elio',
+  'Fenn',
+  'Garo',
+  'Hale',
+  'Ivo',
+  'Jory',
+  'Kasimir',
+  'Lio',
+  'Marek',
+  'Nilo',
+  'Orin',
+  'Pell',
+  'Quin',
+  'Rafe',
+  'Soren',
+  'Tavi',
+  'Ulric',
+  'Vero',
+  'Wren',
+  'Yannick',
+  'Zev',
+  'Teodor',
+  'Matti',
+  'Emrys',
+  'Corvin',
+  'Silas',
+];
+const LAST_A = [
+  'Var',
+  'Hol',
+  'Mer',
+  'Dra',
+  'Kel',
+  'Sto',
+  'Bri',
+  'Lan',
+  'Tor',
+  'Fen',
+  'Gal',
+  'Ost',
+  'Ren',
+  'Wil',
+  'Asc',
+  'Pim',
+  'Cor',
+  'Del',
+  'Mar',
+  'Nov',
+];
+const LAST_B = [
+  'denne',
+  'ström',
+  'achi',
+  'ovic',
+  'ley',
+  'brand',
+  'mont',
+  'eiro',
+  'stad',
+  'quist',
+  'avan',
+  'ford',
+  'ini',
+  'berg',
+  'ado',
+  'rell',
+  'unza',
+  'holt',
+  'ezio',
+  'kaar',
+];
 const POSITIONS = ['GK', 'DF', 'DF', 'DF', 'DF', 'MF', 'MF', 'MF', 'MF', 'FW', 'FW'] as const;
 
-export interface FxClub { id: string; name: string; shortName: string; stadium: string; founded: number }
-export interface FxPlayer { id: string; first: string; last: string; position: 'GK' | 'DF' | 'MF' | 'FW'; nationality: string; shirt: number; spells: Array<{ clubId: string; from: number; to: number }> }
+export interface FxClub {
+  id: string;
+  name: string;
+  shortName: string;
+  stadium: string;
+  founded: number;
+}
+export interface FxPlayer {
+  id: string;
+  first: string;
+  last: string;
+  position: 'GK' | 'DF' | 'MF' | 'FW';
+  nationality: string;
+  shirt: number;
+  spells: Array<{ clubId: string; from: number; to: number }>;
+}
 export interface FxMatch {
-  id: string; season: number; matchday: number; date: string; homeId: string; awayId: string; homeGoals: number; awayGoals: number; venue: string;
+  id: string;
+  season: number;
+  matchday: number;
+  date: string;
+  homeId: string;
+  awayId: string;
+  homeGoals: number;
+  awayGoals: number;
+  venue: string;
   lineups: Record<string, Array<{ playerId: string; position: string; shirt: number }>>;
   scorers: Array<{ playerId: string; clubId: string; minute: number }>;
 }
-export interface FxLeague { clubs: FxClub[]; players: FxPlayer[]; matches: FxMatch[] }
+export interface FxLeague {
+  clubs: FxClub[];
+  players: FxPlayer[];
+  matches: FxMatch[];
+}
 
 export function generateLeague(seed = 20260601): FxLeague {
   const rng = createRng(seed);
   const pick = <T>(a: readonly T[]) => a[Math.floor(rng() * a.length)]!;
   const clubs: FxClub[] = TOWNS.map((t, i) => ({
-    id: `club_${i + 1}`, name: `${t} ${SUFFIX[i]}`, shortName: t, stadium: `${t} ${GROUNDS[i]}`, founded: 1880 + Math.floor(rng() * 60),
+    id: `club_${i + 1}`,
+    name: `${t} ${SUFFIX[i]}`,
+    shortName: t,
+    stadium: `${t} ${GROUNDS[i]}`,
+    founded: 1880 + Math.floor(rng() * 60),
   }));
   const usedNames = new Set<string>();
   const players: FxPlayer[] = [];
   const newPlayer = (position: FxPlayer['position']): FxPlayer => {
-    let first = '', last = '';
-    do { first = pick(FIRST); last = pick(LAST_A) + pick(LAST_B); } while (usedNames.has(`${first} ${last}`));
+    let first = '',
+      last = '';
+    do {
+      first = pick(FIRST);
+      last = pick(LAST_A) + pick(LAST_B);
+    } while (usedNames.has(`${first} ${last}`));
     usedNames.add(`${first} ${last}`);
-    const p: FxPlayer = { id: `pl_${players.length + 1}`, first, last, position, nationality: pick(COUNTRIES), shirt: 0, spells: [] };
+    const p: FxPlayer = {
+      id: `pl_${players.length + 1}`,
+      first,
+      last,
+      position,
+      nationality: pick(COUNTRIES),
+      shirt: 0,
+      spells: [],
+    };
     players.push(p);
     return p;
   };
   // squads per club per season: 16 players (2 GK, 5 DF, 5 MF, 4 FW); ~3 changes per season
-  const shape: FxPlayer['position'][] = ['GK', 'GK', 'DF', 'DF', 'DF', 'DF', 'DF', 'MF', 'MF', 'MF', 'MF', 'MF', 'FW', 'FW', 'FW', 'FW'];
+  const shape: FxPlayer['position'][] = [
+    'GK',
+    'GK',
+    'DF',
+    'DF',
+    'DF',
+    'DF',
+    'DF',
+    'MF',
+    'MF',
+    'MF',
+    'MF',
+    'MF',
+    'FW',
+    'FW',
+    'FW',
+    'FW',
+  ];
   const squads: Record<string, Record<number, FxPlayer[]>> = {};
   for (const c of clubs) {
     squads[c.id] = {};
@@ -83,7 +237,14 @@ export function generateLeague(seed = 20260601): FxLeague {
     const to = Math.min(2010, from + 1 + Math.floor(rng() * 3));
     for (let s = from; s <= to; s++) {
       const sq = squads[target.id]![s]!;
-      const idx = sq.findIndex((x, i) => i > 0 && x.position === p.position && x.spells.length === 1 && x.spells[0]!.from === s && x.spells[0]!.to === s);
+      const idx = sq.findIndex(
+        (x, i) =>
+          i > 0 &&
+          x.position === p.position &&
+          x.spells.length === 1 &&
+          x.spells[0]!.from === s &&
+          x.spells[0]!.to === s,
+      );
       if (idx < 0) continue;
       const removed = sq[idx]!;
       removed.spells = removed.spells.filter((sp) => !(sp.clubId === target.id && sp.from === s));
@@ -103,7 +264,8 @@ export function generateLeague(seed = 20260601): FxLeague {
     const arr = [...ids];
     for (let r = 0; r < ids.length - 1; r++) {
       const pairs: Array<[string, string]> = [];
-      for (let i = 0; i < ids.length / 2; i++) pairs.push(r % 2 === 0 ? [arr[i]!, arr[arr.length - 1 - i]!] : [arr[arr.length - 1 - i]!, arr[i]!]);
+      for (let i = 0; i < ids.length / 2; i++)
+        pairs.push(r % 2 === 0 ? [arr[i]!, arr[arr.length - 1 - i]!] : [arr[arr.length - 1 - i]!, arr[i]!]);
       rounds.push(pairs);
       arr.splice(1, 0, arr.pop()!);
     }
@@ -113,8 +275,17 @@ export function generateLeague(seed = 20260601): FxLeague {
       for (const [homeId, awayId] of pairs) {
         const lineup = (clubId: string) => {
           const sq = squads[clubId]![season]!;
-          const byPos = (pos: string) => shuffle(sq.filter((p) => p.position === pos), rng);
-          const chosen = [...byPos('GK').slice(0, 1), ...byPos('DF').slice(0, 4), ...byPos('MF').slice(0, 4), ...byPos('FW').slice(0, 2)];
+          const byPos = (pos: string) =>
+            shuffle(
+              sq.filter((p) => p.position === pos),
+              rng,
+            );
+          const chosen = [
+            ...byPos('GK').slice(0, 1),
+            ...byPos('DF').slice(0, 4),
+            ...byPos('MF').slice(0, 4),
+            ...byPos('FW').slice(0, 2),
+          ];
           return chosen.map((p, k) => ({ playerId: p.id, position: POSITIONS[k]!, shirt: p.shirt }));
         };
         const lineups = { [homeId]: lineup(homeId), [awayId]: lineup(awayId) };
@@ -125,10 +296,15 @@ export function generateLeague(seed = 20260601): FxLeague {
         const addScorers = (clubId: string, n: number) => {
           const xi = lineups[clubId]!;
           for (let g = 0; g < n; g++) {
-            const w: number[] = xi.map((x) => (x.position === 'FW' ? 6 : x.position === 'MF' ? 3 : x.position === 'DF' ? 1 : 0));
+            const w: number[] = xi.map((x) =>
+              x.position === 'FW' ? 6 : x.position === 'MF' ? 3 : x.position === 'DF' ? 1 : 0,
+            );
             let r = rng() * w.reduce((a, b) => a + b, 0);
             let idx = 0;
-            while (r >= w[idx]!) { r -= w[idx]!; idx++; }
+            while (r >= w[idx]!) {
+              r -= w[idx]!;
+              idx++;
+            }
             scorers.push({ playerId: xi[idx]!.playerId, clubId, minute: 1 + Math.floor(rng() * 90) });
           }
         };
@@ -136,8 +312,17 @@ export function generateLeague(seed = 20260601): FxLeague {
         addScorers(awayId, awayGoals);
         scorers.sort((a, b) => a.minute - b.minute);
         matches.push({
-          id: `m_${season}_${md + 1}_${homeId}_${awayId}`, season, matchday: md + 1, date: d.toISOString().slice(0, 10),
-          homeId, awayId, homeGoals, awayGoals, venue: clubs.find((c) => c.id === homeId)!.stadium, lineups, scorers,
+          id: `m_${season}_${md + 1}_${homeId}_${awayId}`,
+          season,
+          matchday: md + 1,
+          date: d.toISOString().slice(0, 10),
+          homeId,
+          awayId,
+          homeGoals,
+          awayGoals,
+          venue: clubs.find((c) => c.id === homeId)!.stadium,
+          lineups,
+          scorers,
         });
       }
     });
@@ -147,20 +332,46 @@ export function generateLeague(seed = 20260601): FxLeague {
 
 export function canonicalJson(v: unknown): string {
   if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;
-  if (v && typeof v === 'object') return `{${Object.keys(v).sort().map((k) => `${JSON.stringify(k)}:${canonicalJson((v as Record<string, unknown>)[k])}`).join(',')}}`;
+  if (v && typeof v === 'object')
+    return `{${Object.keys(v)
+      .sort()
+      .map((k) => `${JSON.stringify(k)}:${canonicalJson((v as Record<string, unknown>)[k])}`)
+      .join(',')}}`;
   return JSON.stringify(v);
 }
 
-export function snapshot(sourceId: string, recordType: string, externalId: string, payload: unknown, retrievedAt: string): RawSnapshot {
+export function snapshot(
+  sourceId: string,
+  recordType: string,
+  externalId: string,
+  payload: unknown,
+  retrievedAt: string,
+): RawSnapshot {
   const hash = createHash('sha256').update(canonicalJson(payload)).digest('hex');
-  return { id: `snap_${sourceId}_${recordType}_${externalId}`, sourceId, retrievedAt, recordType, externalId, payload, hash };
+  return {
+    id: `snap_${sourceId}_${recordType}_${externalId}`,
+    sourceId,
+    retrievedAt,
+    recordType,
+    externalId,
+    payload,
+    hash,
+  };
 }
 
 /** Converts the simulated league into provider-style raw snapshots, plus the two auxiliary feeds. */
 export function fixtureSnapshots(league: FxLeague, retrievedAt = '2026-11-01T00:00:00.000Z'): RawSnapshot[] {
   const out: RawSnapshot[] = [];
   const S = SYNTHETIC_SOURCE_ID;
-  out.push(snapshot(S, 'competition', 'sdl', { name: FIXTURE_COMPETITION, seasons: FIXTURE_SEASONS, cutoff: CUTOFF }, retrievedAt));
+  out.push(
+    snapshot(
+      S,
+      'competition',
+      'sdl',
+      { name: FIXTURE_COMPETITION, seasons: FIXTURE_SEASONS, cutoff: CUTOFF },
+      retrievedAt,
+    ),
+  );
   for (const c of league.clubs) out.push(snapshot(S, 'club', c.id, c, retrievedAt));
   for (const p of league.players) out.push(snapshot(S, 'player', p.id, p, retrievedAt));
   for (const m of league.matches) out.push(snapshot(S, 'match', m.id, m, retrievedAt));
@@ -173,15 +384,37 @@ export function fixtureSnapshots(league: FxLeague, retrievedAt = '2026-11-01T00:
   const sample = shuffle(keys, rng).slice(0, 80);
   sample.forEach((k, i) => {
     const v = stats[k]!;
-    out.push(snapshot(CROSSCHECK_SOURCE_ID, 'player_season', k, { ...v, goals: i < 6 ? v.goals + 2 : v.goals }, retrievedAt));
+    out.push(
+      snapshot(
+        CROSSCHECK_SOURCE_ID,
+        'player_season',
+        k,
+        { ...v, goals: i < 6 ? v.goals + 2 : v.goals },
+        retrievedAt,
+      ),
+    );
   });
   // pending-rights feed: stadium capacities (invented), must never be published
-  for (const c of league.clubs) out.push(snapshot(PENDING_SOURCE_ID, 'stadium_capacity', c.id, { clubId: c.id, stadium: c.stadium, capacity: 12000 + Math.floor(rng() * 30000) }, retrievedAt));
+  for (const c of league.clubs)
+    out.push(
+      snapshot(
+        PENDING_SOURCE_ID,
+        'stadium_capacity',
+        c.id,
+        { clubId: c.id, stadium: c.stadium, capacity: 12000 + Math.floor(rng() * 30000) },
+        retrievedAt,
+      ),
+    );
   return out;
 }
 
-export function seasonStats(league: FxLeague): Record<string, { playerId: string; clubId: string; season: number; goals: number; apps: number }> {
-  const out: Record<string, { playerId: string; clubId: string; season: number; goals: number; apps: number }> = {};
+export function seasonStats(
+  league: FxLeague,
+): Record<string, { playerId: string; clubId: string; season: number; goals: number; apps: number }> {
+  const out: Record<
+    string,
+    { playerId: string; clubId: string; season: number; goals: number; apps: number }
+  > = {};
   for (const m of league.matches) {
     for (const [clubId, xi] of Object.entries(m.lineups)) {
       for (const s of xi) {

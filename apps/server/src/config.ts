@@ -22,7 +22,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
   const c = Env.parse(env);
   const production = c.NODE_ENV === 'production';
   if (production) {
-    if (c.SESSION_SECRET === 'dev-only-session-secret') throw new Error('SESSION_SECRET must be set in production');
+    if (c.SESSION_SECRET === 'dev-only-session-secret')
+      throw new Error('SESSION_SECRET must be set in production');
     if (c.FT_TIME_SCALE !== 1) throw new Error('FT_TIME_SCALE is test-only and must be 1 in production');
     if (!c.DATABASE_URL) throw new Error('DATABASE_URL is required in production');
   }

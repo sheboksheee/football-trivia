@@ -39,7 +39,9 @@ export function snakeOrder(players: string[], round: number): string[] {
 }
 
 /** Who found each rank (first valid claim wins). Recomputed from the ledger so appeals stay consistent. */
-export function claims(s: Pick<Top25State, 'guesses' | 'voided' | 'accepted'>): Map<number, { guessIndex: number; player: string }> {
+export function claims(
+  s: Pick<Top25State, 'guesses' | 'voided' | 'accepted'>,
+): Map<number, { guessIndex: number; player: string }> {
   const out = new Map<number, { guessIndex: number; player: string }>();
   s.guesses.forEach((g, i) => {
     if (s.voided.includes(i)) return;
@@ -62,16 +64,19 @@ function currentPlayer(s: Top25State): string {
 
 function afterTurn(s: Top25State, at: number): Top25State {
   const found = claims(s).size;
-  if (found >= s.item.entries.length) return { ...s, phase: 'DONE', phaseStart: at, phaseEnd: null, endReason: 'EXHAUSTED' };
+  if (found >= s.item.entries.length)
+    return { ...s, phase: 'DONE', phaseStart: at, phaseEnd: null, endReason: 'EXHAUSTED' };
   let { round, pos } = s;
   pos++;
   if (pos >= s.players.length) {
     // End of an equal-turn cycle: stop if anyone reached the target.
     const sc = scores(s);
-    if (Object.values(sc).some((v) => Number(v) >= TOP25_TARGET)) return { ...s, phase: 'DONE', phaseStart: at, phaseEnd: null, endReason: 'TARGET' };
+    if (Object.values(sc).some((v) => Number(v) >= TOP25_TARGET))
+      return { ...s, phase: 'DONE', phaseStart: at, phaseEnd: null, endReason: 'TARGET' };
     round++;
     pos = 0;
-    if (round >= TOP25_MAX_ROUNDS) return { ...s, phase: 'DONE', phaseStart: at, phaseEnd: null, endReason: 'ROUND_CAP' };
+    if (round >= TOP25_MAX_ROUNDS)
+      return { ...s, phase: 'DONE', phaseStart: at, phaseEnd: null, endReason: 'ROUND_CAP' };
   }
   return { ...s, round, pos, phase: 'TURN', phaseStart: at, phaseEnd: at + s.timing.top25Turn };
 }
@@ -79,7 +84,13 @@ function afterTurn(s: Top25State, at: number): Top25State {
 function record(s: Top25State, g: Omit<Guess, 'duplicate'>, at: number): Top25State {
   const taken = claims(s);
   const guess: Guess = { ...g, duplicate: g.rank !== null && taken.has(g.rank) };
-  return { ...s, guesses: [...s.guesses, guess], phase: 'RESULT', phaseStart: at, phaseEnd: at + s.timing.top25Result };
+  return {
+    ...s,
+    guesses: [...s.guesses, guess],
+    phase: 'RESULT',
+    phaseStart: at,
+    phaseEnd: at + s.timing.top25Result,
+  };
 }
 
 export function matchEntry(item: Top25Item, text: string): number | null {
@@ -94,19 +105,39 @@ export const top25Engine: Engine<Top25State, Top25Item> = {
   itemsNeeded: () => 1,
   init(ctx, items, now) {
     if (!items[0]) throw new Error('TOP 25 needs one list');
-    return { mode: 'top25', players: [...ctx.players], timing: ctx.timing, item: items[0], round: 0, pos: 0, guesses: [], phase: 'TURN', phaseStart: now, phaseEnd: now + ctx.timing.top25Turn, voided: [], accepted: {}, endReason: null };
+    return {
+      mode: 'top25',
+      players: [...ctx.players],
+      timing: ctx.timing,
+      item: items[0],
+      round: 0,
+      pos: 0,
+      guesses: [],
+      phase: 'TURN',
+      phaseStart: now,
+      phaseEnd: now + ctx.timing.top25Turn,
+      voided: [],
+      accepted: {},
+      endReason: null,
+    };
   },
   act(s, actor, action, now) {
     if (action.type !== 'guess') throw new GameError('INVALID_MESSAGE', 'Unknown action');
     if (s.phase !== 'TURN') throw new GameError('INVALID_STATE', 'Not guessing now');
-    if (actor.role !== 'PLAYER' || actor.memberId !== currentPlayer(s)) throw new GameError('FORBIDDEN', 'Not your turn');
+    if (actor.role !== 'PLAYER' || actor.memberId !== currentPlayer(s))
+      throw new GameError('FORBIDDEN', 'Not your turn');
     if (s.phaseEnd !== null && now >= s.phaseEnd) throw new GameError('DEADLINE_PASSED', 'Time is up');
     const text = typeof action.text === 'string' ? action.text.trim() : '';
     if (!text || text.length > 80) throw new GameError('INVALID_MESSAGE', 'Guess must be 1–80 characters');
-    return record(s, { player: actor.memberId, round: s.round, text, at: now, rank: matchEntry(s.item, text) }, now);
+    return record(
+      s,
+      { player: actor.memberId, round: s.round, text, at: now, rank: matchEntry(s.item, text) },
+      now,
+    );
   },
   step(s, d) {
-    if (s.phase === 'TURN') return record(s, { player: currentPlayer(s), round: s.round, text: null, at: d, rank: null }, d);
+    if (s.phase === 'TURN')
+      return record(s, { player: currentPlayer(s), round: s.round, text: null, at: d, rank: null }, d);
     if (s.phase === 'RESULT') return afterTurn(s, d);
     return s;
   },
@@ -128,13 +159,15 @@ export const top25Engine: Engine<Top25State, Top25Item> = {
     return out;
   },
   adjudicate(s, adj) {
-    if (adj.decision === 'VOID') return s.voided.includes(adj.itemIndex) ? s : { ...s, voided: [...s.voided, adj.itemIndex] };
+    if (adj.decision === 'VOID')
+      return s.voided.includes(adj.itemIndex) ? s : { ...s, voided: [...s.voided, adj.itemIndex] };
     if (adj.decision === 'ACCEPT') {
       const rank = adj.detail;
       if (rank === undefined || !s.item.entries.some((e) => e.rank === rank))
         throw new GameError('INVALID_MESSAGE', 'Accepting a TOP 25 appeal requires the matching rank');
       const holder = claims(s).get(rank);
-      if (holder && holder.guessIndex < adj.itemIndex) throw new GameError('RULE_VIOLATION', `Rank ${rank} was already found earlier`);
+      if (holder && holder.guessIndex < adj.itemIndex)
+        throw new GameError('RULE_VIOLATION', `Rank ${rank} was already found earlier`);
       return { ...s, accepted: { ...s.accepted, [String(adj.itemIndex)]: rank } };
     }
     return s;
@@ -159,9 +192,17 @@ export const top25Engine: Engine<Top25State, Top25Item> = {
       // Hidden grid: only found entries (or all once finished) carry labels.
       grid: s.item.entries.map((e) => {
         const c = cl.get(e.rank);
-        return { rank: e.rank, label: c || done ? e.label : null, metric: c || done ? e.metric : null, foundBy: c?.player ?? null };
+        return {
+          rank: e.rank,
+          label: c || done ? e.label : null,
+          metric: c || done ? e.metric : null,
+          foundBy: c?.player ?? null,
+        };
       }),
-      lastGuess: last && s.phase !== 'TURN' ? { player: last.player, text: last.text, rank: last.rank, duplicate: last.duplicate } : null,
+      lastGuess:
+        last && s.phase !== 'TURN'
+          ? { player: last.player, text: last.text, rank: last.rank, duplicate: last.duplicate }
+          : null,
       endReason: s.endReason,
       scores: scores(s),
       attribution: s.item.meta.attribution,

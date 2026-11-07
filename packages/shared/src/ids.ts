@@ -16,7 +16,8 @@ export function generateInviteCode(): string {
   const limit = 256 - (256 % INVITE_ALPHABET.length);
   while (out.length < INVITE_CODE_LENGTH) {
     for (const b of randomBytes(16)) {
-      if (b < limit && out.length < INVITE_CODE_LENGTH) out.push(INVITE_ALPHABET[b % INVITE_ALPHABET.length]!);
+      if (b < limit && out.length < INVITE_CODE_LENGTH)
+        out.push(INVITE_ALPHABET[b % INVITE_ALPHABET.length]!);
     }
   }
   return out.join('');

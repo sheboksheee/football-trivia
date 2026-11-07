@@ -123,13 +123,30 @@ export interface RoomState {
 
 /** Events are the append-only log. Replaying them through `reduce` reconstructs state exactly. */
 export type RoomEvent =
-  | { type: 'create'; at: number; roomId: string; code: string; seed: number; timing: Timing; memberId: string; name: string }
+  | {
+      type: 'create';
+      at: number;
+      roomId: string;
+      code: string;
+      seed: number;
+      timing: Timing;
+      memberId: string;
+      name: string;
+    }
   | { type: 'join'; at: number; memberId: string; name: string; role: RoomRole }
   | { type: 'connect'; at: number; memberId: string }
   | { type: 'disconnect'; at: number; memberId: string }
   | { type: 'tick'; at: number }
   | { type: 'start'; at: number; actorId: string; content: ContentItem[][]; tiebreakContent: McqItem[] }
-  | { type: 'cmd'; at: number; actorId: string; command: Exclude<ClientCommand, { type: 'room.create' | 'room.join' | 'session.resume' | 'room.start' | 'ping' }> };
+  | {
+      type: 'cmd';
+      at: number;
+      actorId: string;
+      command: Exclude<
+        ClientCommand,
+        { type: 'room.create' | 'room.join' | 'session.resume' | 'room.start' | 'ping' }
+      >;
+    };
 
 // ---------------------------------------------------------------- clock helpers
 
@@ -194,7 +211,13 @@ function patchMember(s: RoomState, id: string, patch: Partial<Member>): RoomStat
   return { ...s, members: s.members.map((m) => (m.id === id ? { ...m, ...patch } : m)) };
 }
 
-function audit(s: RoomState, at: number, actor: string, action: string, detail: Record<string, unknown> = {}): RoomState {
+function audit(
+  s: RoomState,
+  at: number,
+  actor: string,
+  action: string,
+  detail: Record<string, unknown> = {},
+): RoomState {
   return { ...s, audit: [...s.audit, { seq: s.audit.length + 1, at, actor, action, detail }] };
 }
 
@@ -207,13 +230,17 @@ export interface PlaylistIssue {
 
 export function validatePlaylist(preset: Preset, modes: ModeKey[]): PlaylistIssue[] {
   const issues: PlaylistIssue[] = [];
-  if (new Set(modes).size !== modes.length) issues.push({ mode: null, message: 'Each mode can appear only once' });
-  if (preset === 'SINGLE' && modes.length !== 1) issues.push({ mode: null, message: 'Single mode needs exactly 1 mode' });
-  if (preset === 'CUSTOM' && (modes.length < 2 || modes.length > 12)) issues.push({ mode: null, message: 'Custom Match Night needs 2–12 modes' });
+  if (new Set(modes).size !== modes.length)
+    issues.push({ mode: null, message: 'Each mode can appear only once' });
+  if (preset === 'SINGLE' && modes.length !== 1)
+    issues.push({ mode: null, message: 'Single mode needs exactly 1 mode' });
+  if (preset === 'CUSTOM' && (modes.length < 2 || modes.length > 12))
+    issues.push({ mode: null, message: 'Custom Match Night needs 2–12 modes' });
   if (preset !== 'CUSTOM' && preset !== 'SINGLE' && modes.length !== PRESET_SIZES[preset])
     issues.push({ mode: null, message: `${preset} needs exactly ${PRESET_SIZES[preset]} modes` });
   for (const k of modes) {
-    if (MODES[k].rulesStatus === 'BLOCKED') issues.push({ mode: k, message: `${MODES[k].name.en} is not playable: rules awaiting approval` });
+    if (MODES[k].rulesStatus === 'BLOCKED')
+      issues.push({ mode: k, message: `${MODES[k].name.en} is not playable: rules awaiting approval` });
   }
   return issues;
 }
@@ -223,15 +250,19 @@ export function startIssues(s: RoomState): PlaylistIssue[] {
   const issues = validatePlaylist(s.playlist.preset, s.playlist.modes);
   const players = activePlayers(s);
   const judges = activeJudges(s).filter((j) => j.connected);
-  if (players.length < MIN_PLAYERS) issues.push({ mode: null, message: `Need at least ${MIN_PLAYERS} players` });
+  if (players.length < MIN_PLAYERS)
+    issues.push({ mode: null, message: `Need at least ${MIN_PLAYERS} players` });
   if (players.length > MAX_PLAYERS) issues.push({ mode: null, message: `At most ${MAX_PLAYERS} players` });
   for (const k of s.playlist.modes) {
     const info = MODES[k];
-    if (players.length < info.minPlayers) issues.push({ mode: k, message: `${info.name.en} needs ${info.minPlayers}+ players` });
-    if (info.judge === 'required' && judges.length === 0) issues.push({ mode: k, message: `${info.name.en} needs a neutral judge (join as Judge)` });
+    if (players.length < info.minPlayers)
+      issues.push({ mode: k, message: `${info.name.en} needs ${info.minPlayers}+ players` });
+    if (info.judge === 'required' && judges.length === 0)
+      issues.push({ mode: k, message: `${info.name.en} needs a neutral judge (join as Judge)` });
   }
   const notReady = players.filter((p) => !p.ready);
-  if (notReady.length > 0) issues.push({ mode: null, message: `Waiting for ${notReady.map((p) => p.name).join(', ')} to be ready` });
+  if (notReady.length > 0)
+    issues.push({ mode: null, message: `Waiting for ${notReady.map((p) => p.name).join(', ')} to be ready` });
   return issues;
 }
 
@@ -248,8 +279,23 @@ export function createRoom(e: Extract<RoomEvent, { type: 'create' }>): RoomState
     hostId: e.memberId,
     coHostId: null,
     hostGraceUntil: null,
-    members: [{ id: e.memberId, name: e.name, role: 'PLAYER', joinedAt: e.at, connected: true, disconnectedAt: null, ready: false, left: false, forfeited: false }],
-    playlist: { preset: 'CLASSIC', modes: ['higher_lower', 'guess_the_match', 'missing_xi', 'last_man_standing', 'timeline'] },
+    members: [
+      {
+        id: e.memberId,
+        name: e.name,
+        role: 'PLAYER',
+        joinedAt: e.at,
+        connected: true,
+        disconnectedAt: null,
+        ready: false,
+        left: false,
+        forfeited: false,
+      },
+    ],
+    playlist: {
+      preset: 'CLASSIC',
+      modes: ['higher_lower', 'guess_the_match', 'missing_xi', 'last_man_standing', 'timeline'],
+    },
     clock: { frozenAccum: 0, frozenSince: null, reasons: [] },
     pause: null,
     pausePending: null,
@@ -297,12 +343,27 @@ function join(s: RoomState, e: Extract<RoomEvent, { type: 'join' }>, at: number)
   const inLobby = s.status === 'LOBBY' || s.status === 'READY_CHECK';
   if (e.role === 'PLAYER') {
     if (!inLobby) throw new GameError('INVALID_STATE', 'Game already started — join as a spectator');
-    if (activePlayers(s).length >= MAX_PLAYERS) throw new GameError('ROOM_FULL', 'Room has 6 players — join as a spectator');
+    if (activePlayers(s).length >= MAX_PLAYERS)
+      throw new GameError('ROOM_FULL', 'Room has 6 players — join as a spectator');
   }
-  if (e.role === 'JUDGE' && !inLobby) throw new GameError('INVALID_STATE', 'Judges must join before the game starts');
+  if (e.role === 'JUDGE' && !inLobby)
+    throw new GameError('INVALID_STATE', 'Judges must join before the game starts');
   let n: RoomState = {
     ...s,
-    members: [...s.members, { id: e.memberId, name: e.name, role: e.role, joinedAt: at, connected: true, disconnectedAt: null, ready: false, left: false, forfeited: false }],
+    members: [
+      ...s.members,
+      {
+        id: e.memberId,
+        name: e.name,
+        role: e.role,
+        joinedAt: at,
+        connected: true,
+        disconnectedAt: null,
+        ready: false,
+        left: false,
+        forfeited: false,
+      },
+    ],
   };
   if (s.status === 'READY_CHECK' && e.role !== 'SPECTATOR') n = backToLobby(n);
   return audit(n, at, e.memberId, 'member.joined', { role: e.role });
@@ -334,7 +395,8 @@ function disconnect(s: RoomState, id: string, at: number): RoomState {
 
 /** Host migration: connected co-host first, else longest-present connected player; else suspend. */
 function migrateHost(s: RoomState, at: number, reason: string, exclude: string | null): RoomState {
-  const eligible = (m: Member) => !m.left && m.connected && m.role === 'PLAYER' && m.id !== exclude && m.id !== s.hostId;
+  const eligible = (m: Member) =>
+    !m.left && m.connected && m.role === 'PLAYER' && m.id !== exclude && m.id !== s.hostId;
   const co = s.coHostId ? s.members.find((m) => m.id === s.coHostId && eligible(m)) : undefined;
   const next = co ?? [...s.members].filter(eligible).sort((a, b) => a.joinedAt - b.joinedAt)[0];
   if (!next) {
@@ -345,11 +407,21 @@ function migrateHost(s: RoomState, at: number, reason: string, exclude: string |
     }
     return audit(n, at, 'SYSTEM', 'room.suspended', { reason: 'No eligible host successor' });
   }
-  const n = { ...s, hostId: next.id, hostGraceUntil: null, coHostId: s.coHostId === next.id ? null : s.coHostId };
+  const n = {
+    ...s,
+    hostId: next.id,
+    hostGraceUntil: null,
+    coHostId: s.coHostId === next.id ? null : s.coHostId,
+  };
   return audit(n, at, 'SYSTEM', 'host.transferred', { from: s.hostId, to: next.id, reason });
 }
 
-function command(s: RoomState, actorId: string, c: Extract<RoomEvent, { type: 'cmd' }>['command'], at: number): RoomState {
+function command(
+  s: RoomState,
+  actorId: string,
+  c: Extract<RoomEvent, { type: 'cmd' }>['command'],
+  at: number,
+): RoomState {
   switch (c.type) {
     case 'room.leave': {
       const m = requireMember(s, actorId);
@@ -364,12 +436,14 @@ function command(s: RoomState, actorId: string, c: Extract<RoomEvent, { type: 'c
     case 'room.ready': {
       const m = requireMember(s, actorId);
       if (m.role !== 'PLAYER') throw new GameError('FORBIDDEN', 'Only players ready up');
-      if (s.status !== 'LOBBY' && s.status !== 'READY_CHECK') throw new GameError('INVALID_STATE', 'Game already started');
+      if (s.status !== 'LOBBY' && s.status !== 'READY_CHECK')
+        throw new GameError('INVALID_STATE', 'Game already started');
       return patchMember(s, actorId, { ready: c.payload.ready });
     }
     case 'room.configure': {
       requireHost(s, actorId);
-      if (s.status !== 'LOBBY' && s.status !== 'READY_CHECK') throw new GameError('INVALID_STATE', 'Playlist is locked once the game starts');
+      if (s.status !== 'LOBBY' && s.status !== 'READY_CHECK')
+        throw new GameError('INVALID_STATE', 'Playlist is locked once the game starts');
       const preset = c.payload.preset as Preset;
       const issues = validatePlaylist(preset, c.payload.modes);
       if (issues.length > 0) throw new GameError('RULE_VIOLATION', issues.map((i) => i.message).join('; '));
@@ -377,7 +451,8 @@ function command(s: RoomState, actorId: string, c: Extract<RoomEvent, { type: 'c
       if (c.payload.coHostId !== undefined) {
         if (c.payload.coHostId !== null) {
           const co = requireMember(s, c.payload.coHostId);
-          if (co.role !== 'PLAYER' || co.id === s.hostId) throw new GameError('RULE_VIOLATION', 'Co-host must be another player');
+          if (co.role !== 'PLAYER' || co.id === s.hostId)
+            throw new GameError('RULE_VIOLATION', 'Co-host must be another player');
         }
         coHostId = c.payload.coHostId;
       }
@@ -389,22 +464,36 @@ function command(s: RoomState, actorId: string, c: Extract<RoomEvent, { type: 'c
       if (s.status !== 'LOBBY') throw new GameError('INVALID_STATE', 'Ready check only from the lobby');
       const issues = validatePlaylist(s.playlist.preset, s.playlist.modes);
       if (issues.length) throw new GameError('RULE_VIOLATION', issues.map((i) => i.message).join('; '));
-      const n = { ...s, status: 'READY_CHECK' as const, members: s.members.map((m) => ({ ...m, ready: false })) };
+      const n = {
+        ...s,
+        status: 'READY_CHECK' as const,
+        members: s.members.map((m) => ({ ...m, ready: false })),
+      };
       return audit(n, at, actorId, 'room.readyCheck');
     }
     case 'room.transferHost': {
       requireHost(s, actorId);
       const to = requireMember(s, c.payload.toMemberId);
-      if (to.role !== 'PLAYER' || !to.connected) throw new GameError('RULE_VIOLATION', 'Host must be a connected player');
+      if (to.role !== 'PLAYER' || !to.connected)
+        throw new GameError('RULE_VIOLATION', 'Host must be a connected player');
       if (to.id === actorId) throw new GameError('RULE_VIOLATION', 'Already host');
-      return audit({ ...s, hostId: to.id, coHostId: s.coHostId === to.id ? null : s.coHostId }, at, actorId, 'host.transferred', { from: actorId, to: to.id, reason: 'manual' });
+      return audit(
+        { ...s, hostId: to.id, coHostId: s.coHostId === to.id ? null : s.coHostId },
+        at,
+        actorId,
+        'host.transferred',
+        { from: actorId, to: to.id, reason: 'manual' },
+      );
     }
     case 'room.kick': {
       requireHost(s, actorId);
       const target = requireMember(s, c.payload.memberId);
       if (target.id === actorId) throw new GameError('RULE_VIOLATION', 'Cannot kick yourself');
       if (s.status === 'IN_PROGRESS' && target.role !== 'SPECTATOR')
-        throw new GameError('RULE_VIOLATION', 'Kicking a participant during play requires an eligible-majority vote, which is not available yet');
+        throw new GameError(
+          'RULE_VIOLATION',
+          'Kicking a participant during play requires an eligible-majority vote, which is not available yet',
+        );
       let n = patchMember(s, target.id, { left: true, connected: false });
       if (s.status === 'READY_CHECK') n = backToLobby(n);
       return audit(n, at, actorId, 'member.kicked', { memberId: target.id, reason: c.payload.reason });
@@ -421,7 +510,8 @@ function command(s: RoomState, actorId: string, c: Extract<RoomEvent, { type: 'c
     case 'room.nextMode': {
       requireHost(s, actorId);
       const mn = s.matchNight;
-      if (!mn || (mn.phase !== 'INTRO' && mn.phase !== 'RESULTS')) throw new GameError('INVALID_STATE', 'Nothing to skip');
+      if (!mn || (mn.phase !== 'INTRO' && mn.phase !== 'RESULTS'))
+        throw new GameError('INVALID_STATE', 'Nothing to skip');
       if (isFrozen(s)) throw new GameError('INVALID_STATE', 'Game is paused');
       return phaseDeadline(s, at, actorId);
     }
@@ -436,14 +526,25 @@ function command(s: RoomState, actorId: string, c: Extract<RoomEvent, { type: 'c
   }
 }
 
-function pauseCmd(s: RoomState, actorId: string, p: { emergency: boolean; reason?: string | undefined }, at: number): RoomState {
+function pauseCmd(
+  s: RoomState,
+  actorId: string,
+  p: { emergency: boolean; reason?: string | undefined },
+  at: number,
+): RoomState {
   requireHost(s, actorId);
-  if (s.status !== 'IN_PROGRESS' || !s.matchNight || s.matchNight.phase === 'FINAL') throw new GameError('INVALID_STATE', 'Nothing to pause');
+  if (s.status !== 'IN_PROGRESS' || !s.matchNight || s.matchNight.phase === 'FINAL')
+    throw new GameError('INVALID_STATE', 'Nothing to pause');
   if (s.pause) throw new GameError('INVALID_STATE', 'Already paused');
   if (p.emergency) {
     const reason = p.reason?.trim();
-    if (!reason || reason.length < 3) throw new GameError('RULE_VIOLATION', 'Emergency pause requires a reason');
-    const n = freeze({ ...s, pause: { emergency: true, reason, by: actorId, since: at }, pausePending: null }, 'PAUSE', at);
+    if (!reason || reason.length < 3)
+      throw new GameError('RULE_VIOLATION', 'Emergency pause requires a reason');
+    const n = freeze(
+      { ...s, pause: { emergency: true, reason, by: actorId, since: at }, pausePending: null },
+      'PAUSE',
+      at,
+    );
     return audit(n, at, actorId, 'pause.emergency', { reason, gameTime: gameNow(s, at) });
   }
   if (atBoundary(s)) return doPause(s, actorId, at);
@@ -451,7 +552,11 @@ function pauseCmd(s: RoomState, actorId: string, p: { emergency: boolean; reason
 }
 
 function doPause(s: RoomState, by: string, at: number): RoomState {
-  const n = freeze({ ...s, pause: { emergency: false, reason: null, by, since: at }, pausePending: null }, 'PAUSE', at);
+  const n = freeze(
+    { ...s, pause: { emergency: false, reason: null, by, since: at }, pausePending: null },
+    'PAUSE',
+    at,
+  );
   return audit(n, at, by, 'pause.started', { gameTime: gameNow(s, at) });
 }
 
@@ -467,14 +572,16 @@ function atBoundary(s: RoomState): boolean {
 
 export function validateStart(s: RoomState, actorId: string): void {
   requireHost(s, actorId);
-  if (s.status !== 'LOBBY' && s.status !== 'READY_CHECK') throw new GameError('INVALID_STATE', 'Game already started');
+  if (s.status !== 'LOBBY' && s.status !== 'READY_CHECK')
+    throw new GameError('INVALID_STATE', 'Game already started');
   const issues = startIssues(s);
   if (issues.length) throw new GameError('RULE_VIOLATION', issues.map((i) => i.message).join('; '));
 }
 
 function start(s: RoomState, e: Extract<RoomEvent, { type: 'start' }>, at: number): RoomState {
   validateStart(s, e.actorId);
-  if (e.content.length !== s.playlist.modes.length) throw new GameError('INTERNAL', 'Content does not match playlist');
+  if (e.content.length !== s.playlist.modes.length)
+    throw new GameError('INTERNAL', 'Content does not match playlist');
   const participants = activePlayers(s).map((m) => m.id);
   const mn: MatchNight = {
     preset: s.playlist.preset,
@@ -505,7 +612,9 @@ function modePlayers(s: RoomState, at: number): { players: string[]; forfeits: s
   for (const id of mn.participants) {
     const m = member(s, id)!;
     // PROPOSED: absent past the 30s grace when a new mode starts => forfeit future modes.
-    const absent = m.left || (!m.connected && m.disconnectedAt !== null && at - m.disconnectedAt >= s.timing.reconnectGrace);
+    const absent =
+      m.left ||
+      (!m.connected && m.disconnectedAt !== null && at - m.disconnectedAt >= s.timing.reconnectGrace);
     if (m.forfeited || absent) forfeits.push(id);
     else players.push(id);
   }
@@ -525,10 +634,14 @@ function beginMode(s: RoomState, index: number, at: number): RoomState {
     }
   }
   const info = MODES[key];
-  const judges = activeJudges(n).filter((j) => j.connected).map((j) => j.id);
+  const judges = activeJudges(n)
+    .filter((j) => j.connected)
+    .map((j) => j.id);
   let skip: string | null = null;
-  if (players.length < Math.max(MIN_PLAYERS, info.minPlayers)) skip = `Only ${players.length} active players; ${info.name.en} needs ${Math.max(MIN_PLAYERS, info.minPlayers)}`;
-  else if (info.judge === 'required' && judges.length === 0) skip = `${info.name.en} needs a neutral judge and none is connected`;
+  if (players.length < Math.max(MIN_PLAYERS, info.minPlayers))
+    skip = `Only ${players.length} active players; ${info.name.en} needs ${Math.max(MIN_PLAYERS, info.minPlayers)}`;
+  else if (info.judge === 'required' && judges.length === 0)
+    skip = `${info.name.en} needs a neutral judge and none is connected`;
   if (skip) {
     const result: ModeResult = { key, skipped: skip, players, scores: {}, groups: [], placement: {} };
     n = { ...n, matchNight: { ...n.matchNight!, index, results: [...n.matchNight!.results, result] } };
@@ -538,7 +651,16 @@ function beginMode(s: RoomState, index: number, at: number): RoomState {
     return beginMode(n, index + 1, at);
   }
   const g = gameNow(n, at);
-  n = { ...n, matchNight: { ...n.matchNight!, index, phase: 'INTRO', phaseEnd: g + n.timing.modeIntro, run: { key, players, judges, state: null } } };
+  n = {
+    ...n,
+    matchNight: {
+      ...n.matchNight!,
+      index,
+      phase: 'INTRO',
+      phaseEnd: g + n.timing.modeIntro,
+      run: { key, players, judges, state: null },
+    },
+  };
   return audit(n, at, 'SYSTEM', 'mode.intro', { mode: key, players });
 }
 
@@ -548,7 +670,11 @@ function playMode(s: RoomState, at: number): RoomState {
   const engine = engineFor(run.key);
   const g = gameNow(s, at);
   const items = mn.content[mn.index]!;
-  const state = engine.init({ players: run.players, judges: run.judges, seed: hashSeed(`${s.seed}:${mn.index}`), timing: s.timing }, items, g);
+  const state = engine.init(
+    { players: run.players, judges: run.judges, seed: hashSeed(`${s.seed}:${mn.index}`), timing: s.timing },
+    items,
+    g,
+  );
   return { ...s, matchNight: { ...mn, phase: 'PLAYING', phaseEnd: null, run: { ...run, state } } };
 }
 
@@ -558,10 +684,27 @@ function completeMode(s: RoomState, at: number): RoomState {
   const engine = engineFor(run.key);
   const scores = engine.scores(run.state);
   const groups = engine.ranking(run.state);
-  const placement = Object.fromEntries(Object.entries(placementShares(groups)).map(([k, v]) => [k, v.toString()]));
-  const result: ModeResult = { key: run.key as ModeKey, skipped: null, players: run.players, scores, groups, placement };
+  const placement = Object.fromEntries(
+    Object.entries(placementShares(groups)).map(([k, v]) => [k, v.toString()]),
+  );
+  const result: ModeResult = {
+    key: run.key as ModeKey,
+    skipped: null,
+    players: run.players,
+    scores,
+    groups,
+    placement,
+  };
   const g = gameNow(s, at);
-  let n: RoomState = { ...s, matchNight: { ...mn, phase: 'RESULTS', phaseEnd: g + s.timing.modeResults, results: [...mn.results, result] } };
+  let n: RoomState = {
+    ...s,
+    matchNight: {
+      ...mn,
+      phase: 'RESULTS',
+      phaseEnd: g + s.timing.modeResults,
+      results: [...mn.results, result],
+    },
+  };
   n = audit(n, at, 'SYSTEM', 'mode.completed', { mode: run.key, scores, groups, placement });
   return n;
 }
@@ -571,24 +714,50 @@ function finishMatch(s: RoomState, at: number): RoomState {
   const outcomes = mn.results.filter((r) => !r.skipped).map((r) => ({ groups: r.groups }));
   const { rows, groups } = computeStandings(mn.participants, outcomes);
   const top = groups[0] ?? [];
-  const standings = rows.map((r) => ({ memberId: r.memberId, points: r.points.toString(), sole1: r.sole1, sole2: r.sole2, sole3: r.sole3 }));
+  const standings = rows.map((r) => ({
+    memberId: r.memberId,
+    points: r.points.toString(),
+    sole1: r.sole1,
+    sole2: r.sole2,
+    sole3: r.sole3,
+  }));
   if (top.length > 1 && outcomes.length > 0 && mn.tiebreakContent.length > 0) {
     const g = gameNow(s, at);
     const engine = engineFor('tiebreak');
-    const state = engine.init({ players: top, judges: [], seed: hashSeed(`${s.seed}:tiebreak`), timing: s.timing }, mn.tiebreakContent, g);
+    const state = engine.init(
+      { players: top, judges: [], seed: hashSeed(`${s.seed}:tiebreak`), timing: s.timing },
+      mn.tiebreakContent,
+      g,
+    );
     const n: RoomState = {
       ...s,
-      matchNight: { ...mn, phase: 'TIEBREAK', phaseEnd: null, run: { key: 'tiebreak', players: top, judges: [], state }, final: { groups, champions: [], standings, tiebreakUsed: true } },
+      matchNight: {
+        ...mn,
+        phase: 'TIEBREAK',
+        phaseEnd: null,
+        run: { key: 'tiebreak', players: top, judges: [], state },
+        final: { groups, champions: [], standings, tiebreakUsed: true },
+      },
     };
     return audit(n, at, 'SYSTEM', 'tiebreak.started', { tied: top });
   }
   return finalize(s, groups, standings, false, at);
 }
 
-function finalize(s: RoomState, groups: string[][], standings: FinalResult['standings'], tiebreakUsed: boolean, at: number): RoomState {
+function finalize(
+  s: RoomState,
+  groups: string[][],
+  standings: FinalResult['standings'],
+  tiebreakUsed: boolean,
+  at: number,
+): RoomState {
   const champions = groups[0] ?? [];
   const final: FinalResult = { groups, champions, standings, tiebreakUsed };
-  let n: RoomState = { ...s, status: 'COMPLETED', matchNight: { ...s.matchNight!, phase: 'FINAL', phaseEnd: null, final } };
+  let n: RoomState = {
+    ...s,
+    status: 'COMPLETED',
+    matchNight: { ...s.matchNight!, phase: 'FINAL', phaseEnd: null, final },
+  };
   n = unfreeze(unfreeze({ ...n, pause: null, pausePending: null }, 'PAUSE', at), 'APPEAL', at);
   return audit(n, at, 'SYSTEM', 'match.completed', { champions, groups, standings });
 }
@@ -615,11 +784,18 @@ function phaseDeadline(s: RoomState, at: number, actor = 'SYSTEM'): RoomState {
 function gameAction(s: RoomState, actorId: string, action: Record<string, unknown>, at: number): RoomState {
   const m = requireMember(s, actorId);
   const mn = s.matchNight;
-  if (s.status !== 'IN_PROGRESS' || !mn || (mn.phase !== 'PLAYING' && mn.phase !== 'TIEBREAK') || !mn.run?.state)
+  if (
+    s.status !== 'IN_PROGRESS' ||
+    !mn ||
+    (mn.phase !== 'PLAYING' && mn.phase !== 'TIEBREAK') ||
+    !mn.run?.state
+  )
     throw new GameError('INVALID_STATE', 'No round in progress');
-  if (isFrozen(s)) throw new GameError('INVALID_STATE', s.pause ? 'Game is paused' : 'Game is on hold for an appeal');
+  if (isFrozen(s))
+    throw new GameError('INVALID_STATE', s.pause ? 'Game is paused' : 'Game is on hold for an appeal');
   const run = mn.run;
-  if (m.role === 'PLAYER' && !run.players.includes(actorId)) throw new GameError('FORBIDDEN', 'You are not playing this mode');
+  if (m.role === 'PLAYER' && !run.players.includes(actorId))
+    throw new GameError('FORBIDDEN', 'You are not playing this mode');
   if (m.role === 'SPECTATOR') throw new GameError('FORBIDDEN', 'Spectators cannot act');
   if (typeof action.type !== 'string') throw new GameError('INVALID_MESSAGE', 'action.type required');
   const engine = engineFor(run.key);
@@ -629,10 +805,18 @@ function gameAction(s: RoomState, actorId: string, action: Record<string, unknow
   return n;
 }
 
-function eligibleAdjudicators(s: RoomState, runIndex: number, itemIndex: number, claimantId: string): string[] {
+function eligibleAdjudicators(
+  s: RoomState,
+  runIndex: number,
+  itemIndex: number,
+  claimantId: string,
+): string[] {
   const mn = s.matchNight!;
   const run = mn.run!;
-  const grader = runIndex === mn.index || run.key === 'tiebreak' ? engineFor(run.key).gradedBy(run.state, itemIndex, claimantId) : null;
+  const grader =
+    runIndex === mn.index || run.key === 'tiebreak'
+      ? engineFor(run.key).gradedBy(run.state, itemIndex, claimantId)
+      : null;
   return activeJudges(s)
     .filter((j) => j.connected && j.id !== grader && j.id !== claimantId)
     .map((j) => j.id);
@@ -642,17 +826,27 @@ function runIndexOf(mn: MatchNight): number {
   return mn.phase === 'TIEBREAK' ? -1 : mn.index;
 }
 
-function openAppeal(s: RoomState, actorId: string, p: { questionIndex: number; reason: AppealReason; note?: string | undefined }, at: number): RoomState {
+function openAppeal(
+  s: RoomState,
+  actorId: string,
+  p: { questionIndex: number; reason: AppealReason; note?: string | undefined },
+  at: number,
+): RoomState {
   const m = requireMember(s, actorId);
   if (m.role !== 'PLAYER') throw new GameError('FORBIDDEN', 'Only players can appeal');
   const mn = s.matchNight;
-  if (!mn?.run?.state || (mn.phase !== 'PLAYING' && mn.phase !== 'TIEBREAK')) throw new GameError('INVALID_STATE', 'No appealable result');
+  if (!mn?.run?.state || (mn.phase !== 'PLAYING' && mn.phase !== 'TIEBREAK'))
+    throw new GameError('INVALID_STATE', 'No appealable result');
   const engine = engineFor(mn.run.key);
   const win = engine.appealWindows(mn.run.state, gameNow(s, at)).find((w) => w.itemIndex === p.questionIndex);
   if (!win) throw new GameError('DEADLINE_PASSED', 'The 15s appeal window has closed');
   if (!win.eligible.includes(actorId)) throw new GameError('FORBIDDEN', 'You cannot appeal this result');
   const runIndex = runIndexOf(mn);
-  if (s.appeals.some((a) => a.runIndex === runIndex && a.itemIndex === p.questionIndex && a.claimantId === actorId))
+  if (
+    s.appeals.some(
+      (a) => a.runIndex === runIndex && a.itemIndex === p.questionIndex && a.claimantId === actorId,
+    )
+  )
     throw new GameError('DUPLICATE', 'One appeal per player per question');
   const appeal: Appeal = {
     id: `ap_${s.version}_${s.appeals.length + 1}`,
@@ -669,7 +863,12 @@ function openAppeal(s: RoomState, actorId: string, p: { questionIndex: number; r
     detail: null,
   };
   let n: RoomState = { ...s, appeals: [...s.appeals, appeal] };
-  n = audit(n, at, actorId, 'appeal.opened', { appealId: appeal.id, mode: mn.run.key, itemIndex: p.questionIndex, reason: p.reason });
+  n = audit(n, at, actorId, 'appeal.opened', {
+    appealId: appeal.id,
+    mode: mn.run.key,
+    itemIndex: p.questionIndex,
+    reason: p.reason,
+  });
   if (eligibleAdjudicators(n, runIndex, p.questionIndex, actorId).length === 0) {
     // GDD §7: no eligible neutral reviewer => void the disputed question; never award points arbitrarily.
     return autoVoid(n, appeal.id, at, 'No eligible neutral reviewer');
@@ -683,16 +882,30 @@ function autoVoid(s: RoomState, appealId: string, at: number, why: string): Room
   let n = s;
   if (mn.run?.state && runIndexOf(mn) === a.runIndex) {
     const engine = engineFor(mn.run.key);
-    const state = engine.adjudicate(mn.run.state, { itemIndex: a.itemIndex, claimantId: a.claimantId, decision: 'VOID' });
+    const state = engine.adjudicate(mn.run.state, {
+      itemIndex: a.itemIndex,
+      claimantId: a.claimantId,
+      decision: 'VOID',
+    });
     n = { ...n, matchNight: { ...mn, run: { ...mn.run, state } } };
   }
-  n = { ...n, appeals: n.appeals.map((x) => (x.id === appealId ? { ...x, status: 'AUTO_VOIDED' as const, decidedAt: at, decisionNote: why } : x)) };
+  n = {
+    ...n,
+    appeals: n.appeals.map((x) =>
+      x.id === appealId ? { ...x, status: 'AUTO_VOIDED' as const, decidedAt: at, decisionNote: why } : x,
+    ),
+  };
   n = audit(n, at, 'SYSTEM', 'appeal.autoVoided', { appealId, why });
   if (!n.appeals.some((x) => x.status === 'PENDING')) n = unfreeze(n, 'APPEAL', at);
   return n;
 }
 
-function resolveAppeal(s: RoomState, actorId: string, p: { appealId: string; decision: AppealDecision; note: string; detail?: number | undefined }, at: number): RoomState {
+function resolveAppeal(
+  s: RoomState,
+  actorId: string,
+  p: { appealId: string; decision: AppealDecision; note: string; detail?: number | undefined },
+  at: number,
+): RoomState {
   const m = requireMember(s, actorId);
   if (m.role !== 'JUDGE') throw new GameError('FORBIDDEN', 'Only a neutral judge can resolve appeals');
   const a = s.appeals.find((x) => x.id === p.appealId);
@@ -701,15 +914,30 @@ function resolveAppeal(s: RoomState, actorId: string, p: { appealId: string; dec
     throw new GameError('CONFLICT_OF_INTEREST', 'You graded this answer; another judge must review it');
   const mn = s.matchNight!;
   const engine = engineFor(mn.run!.key);
-  if (!engine.supportedDecisions.includes(p.decision)) throw new GameError('RULE_VIOLATION', 'Decision not supported in this mode');
-  const state = engine.adjudicate(mn.run!.state, { itemIndex: a.itemIndex, claimantId: a.claimantId, decision: p.decision, ...(p.detail !== undefined ? { detail: p.detail } : {}) });
+  if (!engine.supportedDecisions.includes(p.decision))
+    throw new GameError('RULE_VIOLATION', 'Decision not supported in this mode');
+  const state = engine.adjudicate(mn.run!.state, {
+    itemIndex: a.itemIndex,
+    claimantId: a.claimantId,
+    decision: p.decision,
+    ...(p.detail !== undefined ? { detail: p.detail } : {}),
+  });
   const status = p.decision === 'ACCEPT' ? 'ACCEPTED' : p.decision === 'REJECT' ? 'REJECTED' : 'VOIDED';
   let n: RoomState = {
     ...s,
     matchNight: { ...mn, run: { ...mn.run!, state } },
-    appeals: s.appeals.map((x) => (x.id === a.id ? { ...x, status, decidedBy: actorId, decidedAt: at, decisionNote: p.note, detail: p.detail ?? null } : x)),
+    appeals: s.appeals.map((x) =>
+      x.id === a.id
+        ? { ...x, status, decidedBy: actorId, decidedAt: at, decisionNote: p.note, detail: p.detail ?? null }
+        : x,
+    ),
   };
-  n = audit(n, at, actorId, 'appeal.resolved', { appealId: a.id, decision: p.decision, note: p.note, detail: p.detail ?? null });
+  n = audit(n, at, actorId, 'appeal.resolved', {
+    appealId: a.id,
+    decision: p.decision,
+    note: p.note,
+    detail: p.detail ?? null,
+  });
   if (!n.appeals.some((x) => x.status === 'PENDING')) n = unfreeze(n, 'APPEAL', at);
   return n;
 }
@@ -730,11 +958,13 @@ export function nextDeadline(s: RoomState): Deadline | null {
   for (const m of s.members) {
     if (m.left || m.connected || m.disconnectedAt === null) continue;
     const exp = m.disconnectedAt + s.timing.reconnectGrace;
-    if (lobby || (m.role === 'JUDGE' && s.appeals.some((a) => a.status === 'PENDING'))) out.push({ at: exp, kind: 'member', ref: m.id });
+    if (lobby || (m.role === 'JUDGE' && s.appeals.some((a) => a.status === 'PENDING')))
+      out.push({ at: exp, kind: 'member', ref: m.id });
   }
   const mn = s.matchNight;
   if (mn && s.status === 'IN_PROGRESS' && !isFrozen(s)) {
-    if ((mn.phase === 'INTRO' || mn.phase === 'RESULTS') && mn.phaseEnd !== null) out.push({ at: toReal(s, mn.phaseEnd), kind: 'phase' });
+    if ((mn.phase === 'INTRO' || mn.phase === 'RESULTS') && mn.phaseEnd !== null)
+      out.push({ at: toReal(s, mn.phaseEnd), kind: 'phase' });
     if ((mn.phase === 'PLAYING' || mn.phase === 'TIEBREAK') && mn.run?.state) {
       const engine = engineFor(mn.run.key);
       const d = engine.nextDeadline(mn.run.state);
@@ -779,7 +1009,8 @@ function processDeadline(s: RoomState, d: Deadline): RoomState {
       }
       // A judge gone beyond grace can no longer resolve pending appeals.
       for (const a of n.appeals.filter((x) => x.status === 'PENDING')) {
-        if (eligibleAdjudicators(n, a.runIndex, a.itemIndex, a.claimantId).length === 0) n = autoVoid(n, a.id, at, 'Judge disconnected');
+        if (eligibleAdjudicators(n, a.runIndex, a.itemIndex, a.claimantId).length === 0)
+          n = autoVoid(n, a.id, at, 'Judge disconnected');
       }
       return n;
     }
@@ -793,7 +1024,9 @@ function processDeadline(s: RoomState, d: Deadline): RoomState {
       return { ...withNow, matchNight: { ...mn, run: { ...run, state } } };
     }
     case 'appealsClose':
-      return withNow.matchNight!.phase === 'TIEBREAK' ? finishTiebreak(withNow, at) : completeMode(withNow, at);
+      return withNow.matchNight!.phase === 'TIEBREAK'
+        ? finishTiebreak(withNow, at)
+        : completeMode(withNow, at);
   }
 }
 
@@ -841,14 +1074,26 @@ export function project(s: RoomState, viewer: Viewer, at: number) {
       note: isJudge || a.claimantId === mine ? a.note : null,
       status: a.status,
       decisionNote: a.decisionNote,
-      canResolve: !!(isJudge && mine && a.status === 'PENDING' && mn?.run && eligibleAdjudicators(s, a.runIndex, a.itemIndex, a.claimantId).includes(mine)),
+      canResolve: !!(
+        isJudge &&
+        mine &&
+        a.status === 'PENDING' &&
+        mn?.run &&
+        eligibleAdjudicators(s, a.runIndex, a.itemIndex, a.claimantId).includes(mine)
+      ),
       mine: a.claimantId === mine,
     }));
   const windows =
     engine && run?.state && me?.role === 'PLAYER'
       ? engine
           .appealWindows(run.state, g)
-          .filter((w) => w.eligible.includes(me.id) && !s.appeals.some((a) => a.runIndex === runIndex && a.itemIndex === w.itemIndex && a.claimantId === me.id))
+          .filter(
+            (w) =>
+              w.eligible.includes(me.id) &&
+              !s.appeals.some(
+                (a) => a.runIndex === runIndex && a.itemIndex === w.itemIndex && a.claimantId === me.id,
+              ),
+          )
           .map((w) => ({ itemIndex: w.itemIndex, closesAt: w.closesAt }))
       : [];
   const visibleMembers = activeMembers(s).filter((m) => m.role !== 'SPECTATOR');
@@ -862,13 +1107,23 @@ export function project(s: RoomState, viewer: Viewer, at: number) {
       playlist: s.playlist,
       hostGraceUntil: s.hostGraceUntil,
     },
-    me: me ? { memberId: me.id, role: me.role, name: me.name, isHost: s.hostId === me.id, forfeited: me.forfeited } : null,
-    members: visibleMembers.map((m) => ({ id: m.id, name: m.name, role: m.role, connected: m.connected, ready: m.ready, forfeited: m.forfeited })),
+    me: me
+      ? { memberId: me.id, role: me.role, name: me.name, isHost: s.hostId === me.id, forfeited: me.forfeited }
+      : null,
+    members: visibleMembers.map((m) => ({
+      id: m.id,
+      name: m.name,
+      role: m.role,
+      connected: m.connected,
+      ready: m.ready,
+      forfeited: m.forfeited,
+    })),
     spectatorCount: activeMembers(s).filter((m) => m.role === 'SPECTATOR').length,
     clock: { gameNow: g, frozen: isFrozen(s), reasons: s.clock.reasons },
     pause: s.pause ? { emergency: s.pause.emergency, reason: s.pause.reason, since: s.pause.since } : null,
     pausePending: !!s.pausePending,
-    startIssues: s.status === 'LOBBY' || s.status === 'READY_CHECK' ? startIssues(s).map((i) => i.message) : [],
+    startIssues:
+      s.status === 'LOBBY' || s.status === 'READY_CHECK' ? startIssues(s).map((i) => i.message) : [],
     matchNight: mn
       ? {
           preset: mn.preset,
@@ -883,7 +1138,7 @@ export function project(s: RoomState, viewer: Viewer, at: number) {
           results: mn.results,
           standings: standingsView(mn),
           final: mn.final && mn.phase === 'FINAL' ? mn.final : null,
-          tiebreakTied: mn.phase === 'TIEBREAK' ? mn.final?.groups[0] ?? [] : null,
+          tiebreakTied: mn.phase === 'TIEBREAK' ? (mn.final?.groups[0] ?? []) : null,
         }
       : null,
     appeals,
@@ -894,7 +1149,14 @@ export function project(s: RoomState, viewer: Viewer, at: number) {
 function standingsView(mn: MatchNight) {
   const outcomes = mn.results.filter((r) => !r.skipped).map((r) => ({ groups: r.groups }));
   const { rows } = computeStandings(mn.participants, outcomes);
-  return rows.map((r) => ({ memberId: r.memberId, points: r.points.toString(), display: r.points.toMixed(), sole1: r.sole1, sole2: r.sole2, sole3: r.sole3 }));
+  return rows.map((r) => ({
+    memberId: r.memberId,
+    points: r.points.toString(),
+    display: r.points.toMixed(),
+    sole1: r.sole1,
+    sole2: r.sole2,
+    sole3: r.sole3,
+  }));
 }
 
 export type RoomView = ReturnType<typeof project>;

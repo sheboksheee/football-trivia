@@ -15,7 +15,12 @@ const TRANSITIONS: Record<ReviewAction, { from: QuestionStatus[]; to: QuestionSt
 };
 
 /** Configurable playlist difficulty mix (Blueprint C2 starting policy). */
-export const DEFAULT_MIX: Record<DifficultyInfo['tier'], number> = { EASY: 0.3, MEDIUM: 0.45, HARD: 0.2, EXPERT: 0.05 };
+export const DEFAULT_MIX: Record<DifficultyInfo['tier'], number> = {
+  EASY: 0.3,
+  MEDIUM: 0.45,
+  HARD: 0.2,
+  EXPERT: 0.05,
+};
 
 export class ReviewError extends Error {}
 
@@ -42,12 +47,19 @@ export class QuestionBank {
     return out;
   }
 
-  review(id: string, action: ReviewAction, reviewerId: string, note: string, at = new Date().toISOString()): Question {
+  review(
+    id: string,
+    action: ReviewAction,
+    reviewerId: string,
+    note: string,
+    at = new Date().toISOString(),
+  ): Question {
     const q = this.byId.get(id);
     if (!q) throw new ReviewError('Question not found');
     if (!note || note.trim().length < 3) throw new ReviewError('A review note is required');
     const t = TRANSITIONS[action];
-    if (!t.from.includes(q.status)) throw new ReviewError(`Cannot ${action} a question in status ${q.status}`);
+    if (!t.from.includes(q.status))
+      throw new ReviewError(`Cannot ${action} a question in status ${q.status}`);
     if (action === 'APPROVE') {
       // Approval re-asserts the hard gates: every gate must pass except an explicit NEEDS_REVIEW flag.
       const hard = q.gates.filter((g) => !g.passed && g.failureStatus !== 'NEEDS_REVIEW');
@@ -59,7 +71,17 @@ export class QuestionBank {
       ...q,
       status: t.to,
       version: action === 'APPROVE' || action === 'RESTORE' ? q.version : q.version,
-      audit: [...q.audit, { at, actor: reviewerId, action: `review.${action.toLowerCase()}`, fromStatus: q.status, toStatus: t.to, note: note.trim() }],
+      audit: [
+        ...q.audit,
+        {
+          at,
+          actor: reviewerId,
+          action: `review.${action.toLowerCase()}`,
+          fromStatus: q.status,
+          toStatus: t.to,
+          note: note.trim(),
+        },
+      ],
     };
     this.byId.set(id, next);
     return next;
@@ -78,12 +100,19 @@ export class QuestionBank {
    * Draws `count` PUBLISHED items of a kind, excluding ids already used in this room/session,
    * balancing difficulty toward `mix`. Deterministic for a given rng.
    */
-  draw(kind: ContentKind, count: number, rng: () => number, exclude: Set<string> = new Set(), mix = DEFAULT_MIX): ContentItem[] {
+  draw(
+    kind: ContentKind,
+    count: number,
+    rng: () => number,
+    exclude: Set<string> = new Set(),
+    mix = DEFAULT_MIX,
+  ): ContentItem[] {
     const pool = shuffle(
       this.all().filter((q) => q.kind === kind && q.status === 'PUBLISHED' && !exclude.has(q.id)),
       rng,
     );
-    if (pool.length < count) throw new ReviewError(`Not enough published ${kind} questions (${pool.length}/${count})`);
+    if (pool.length < count)
+      throw new ReviewError(`Not enough published ${kind} questions (${pool.length}/${count})`);
     const byTier = new Map<string, Question[]>();
     for (const q of pool) byTier.set(q.difficulty.tier, [...(byTier.get(q.difficulty.tier) ?? []), q]);
     const picked: Question[] = [];
@@ -91,7 +120,12 @@ export class QuestionBank {
     for (const [tier, share] of tiers) {
       const want = Math.round(share * count);
       const avail = byTier.get(tier) ?? [];
-      while (picked.length < count && avail.length && picked.filter((p) => p.difficulty.tier === tier).length < want) picked.push(avail.shift()!);
+      while (
+        picked.length < count &&
+        avail.length &&
+        picked.filter((p) => p.difficulty.tier === tier).length < want
+      )
+        picked.push(avail.shift()!);
     }
     for (const q of pool) if (picked.length < count && !picked.includes(q)) picked.push(q);
     for (const q of picked) exclude.add(q.id);

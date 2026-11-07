@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
-  connectionsEngine, DEFAULT_TIMING as T, guessTheMatchEngine, higherLowerEngine, higherLowerScore,
-  lastManStandingEngine, missingXiEngine, tiebreakEngine,
+  connectionsEngine,
+  DEFAULT_TIMING as T,
+  guessTheMatchEngine,
+  higherLowerEngine,
+  higherLowerScore,
+  lastManStandingEngine,
+  missingXiEngine,
+  tiebreakEngine,
 } from '../src/index.js';
 import { conn, ctx, gm, hl, mcq, P, runTo, xi } from './fixtures.js';
 
@@ -38,12 +44,22 @@ describe('Higher or Lower (APPROVED)', () => {
 
   it('closes early when everyone answered; rejects late, duplicate, stale and non-player answers', () => {
     let s = higherLowerEngine.init(ctx(['a', 'b']), items, 0);
-    expect(() => higherLowerEngine.act(s, pl('a'), { type: 'answer', choice: 'UP' }, 1)).toThrow(/HIGHER or LOWER/);
-    expect(() => higherLowerEngine.act(s, P('SPECTATOR', 'x'), { type: 'answer', choice: 'HIGHER' }, 1)).toThrow(/Only players/);
-    expect(() => higherLowerEngine.act(s, pl('a'), { type: 'answer', choice: 'HIGHER', itemIndex: 3 }, 1)).toThrow(/different question/);
+    expect(() => higherLowerEngine.act(s, pl('a'), { type: 'answer', choice: 'UP' }, 1)).toThrow(
+      /HIGHER or LOWER/,
+    );
+    expect(() =>
+      higherLowerEngine.act(s, P('SPECTATOR', 'x'), { type: 'answer', choice: 'HIGHER' }, 1),
+    ).toThrow(/Only players/);
+    expect(() =>
+      higherLowerEngine.act(s, pl('a'), { type: 'answer', choice: 'HIGHER', itemIndex: 3 }, 1),
+    ).toThrow(/different question/);
     s = higherLowerEngine.act(s, pl('a'), { type: 'answer', choice: 'HIGHER' }, 100);
-    expect(() => higherLowerEngine.act(s, pl('a'), { type: 'answer', choice: 'LOWER' }, 200)).toThrow(/locked/);
-    expect(() => higherLowerEngine.act(s, pl('b'), { type: 'answer', choice: 'LOWER' }, T.higherLowerQuestion)).toThrow(/Time is up/);
+    expect(() => higherLowerEngine.act(s, pl('a'), { type: 'answer', choice: 'LOWER' }, 200)).toThrow(
+      /locked/,
+    );
+    expect(() =>
+      higherLowerEngine.act(s, pl('b'), { type: 'answer', choice: 'LOWER' }, T.higherLowerQuestion),
+    ).toThrow(/Time is up/);
     s = higherLowerEngine.act(s, pl('b'), { type: 'answer', choice: 'LOWER' }, 300);
     expect(s.phase).toBe('REVEAL');
     expect(s.phaseEnd).toBe(300 + T.appealWindow);
@@ -68,7 +84,9 @@ describe('Higher or Lower (APPROVED)', () => {
     let s = higherLowerEngine.init(ctx(['a', 'b']), items, 0);
     s = higherLowerEngine.act(s, pl('a'), { type: 'answer', choice: 'HIGHER' }, 1);
     s = higherLowerEngine.act(s, pl('b'), { type: 'answer', choice: 'LOWER' }, 2);
-    expect(higherLowerEngine.appealWindows(s, 3)).toEqual([{ itemIndex: 0, closesAt: 2 + T.appealWindow, eligible: ['a', 'b'] }]);
+    expect(higherLowerEngine.appealWindows(s, 3)).toEqual([
+      { itemIndex: 0, closesAt: 2 + T.appealWindow, eligible: ['a', 'b'] },
+    ]);
     expect(higherLowerEngine.appealWindows(s, 2 + T.appealWindow)).toEqual([]);
     const acc = higherLowerEngine.adjudicate(s, { itemIndex: 0, claimantId: 'b', decision: 'ACCEPT' });
     expect(higherLowerEngine.scores(acc)).toEqual({ a: '2', b: '2' });
@@ -88,14 +106,18 @@ describe('Last Man Standing (PROVISIONAL ordering)', () => {
   const items = Array.from({ length: 15 }, (_, i) => mcq(i));
   it('3 hearts, wrong/timeout loses a heart, ends at <=1 alive, placement 5/3/1 + perfect bonus', () => {
     let s = lastManStandingEngine.init(ctx(['a', 'b', 'c']), items, 0);
-    const answer = (m: string, opt: string) => (s = lastManStandingEngine.act(s, pl(m), { type: 'answer', optionId: opt }, s.phaseStart + 10));
+    const answer = (m: string, opt: string) =>
+      (s = lastManStandingEngine.act(s, pl(m), { type: 'answer', optionId: opt }, s.phaseStart + 10));
     // Q1: a right, b wrong, c timeout
-    answer('a', 'o1'); answer('b', 'o2');
+    answer('a', 'o1');
+    answer('b', 'o2');
     s = runTo(lastManStandingEngine, s, s.phaseStart + T.lmsQuestion + T.appealWindow);
     expect(s.extra.public.hearts).toEqual({ a: 3, b: 2, c: 2 });
     // Q2, Q3: a right; b wrong; c wrong -> b and c eliminated at the same question (index 2)
     for (let q = 0; q < 2; q++) {
-      answer('a', 'o1'); answer('b', 'o3'); answer('c', 'o4');
+      answer('a', 'o1');
+      answer('b', 'o3');
+      answer('c', 'o4');
       s = runTo(lastManStandingEngine, s, s.phaseEnd!);
     }
     expect(s.extra.public.hearts).toEqual({ a: 3, b: 0, c: 0 });
@@ -113,7 +135,9 @@ describe('Last Man Standing (PROVISIONAL ordering)', () => {
       s = runTo(lastManStandingEngine, s, s.phaseEnd!);
     }
     expect(s.eligibleByItem[3]).toEqual(['a', 'b']);
-    expect(() => lastManStandingEngine.act(s, pl('c'), { type: 'answer', optionId: 'o1' }, s.phaseStart + 1)).toThrow(/not answering/);
+    expect(() =>
+      lastManStandingEngine.act(s, pl('c'), { type: 'answer', optionId: 'o1' }, s.phaseStart + 1),
+    ).toThrow(/not answering/);
   });
   it('a voided question costs no hearts; runs at most 15 questions', () => {
     let s = lastManStandingEngine.init(ctx(['a', 'b']), items, 0);
@@ -166,7 +190,9 @@ describe('Guess the Match (APPROVED)', () => {
   const items = Array.from({ length: 8 }, (_, i) => gm(i));
   it('clues at 0/10/20s; +5/+3/+1 by tier; no speed bonus; wrong 0', () => {
     let s = guessTheMatchEngine.init(ctx(['a', 'b', 'c', 'd']), items, 0);
-    expect((guessTheMatchEngine.view(s, { memberId: 'a', role: 'PLAYER' }, 9999) as any).item.clues).toEqual(['c1']);
+    expect((guessTheMatchEngine.view(s, { memberId: 'a', role: 'PLAYER' }, 9999) as any).item.clues).toEqual([
+      'c1',
+    ]);
     expect(guessTheMatchEngine.nextDeadline(s)).toBe(10000); // milestone for clue 2
     s = guessTheMatchEngine.act(s, pl('a'), { type: 'answer', optionId: 'm2' }, 9999);
     s = guessTheMatchEngine.step(s, 10000);
@@ -179,7 +205,9 @@ describe('Guess the Match (APPROVED)', () => {
   });
   it('future clues never reach clients', () => {
     const s = guessTheMatchEngine.init(ctx(['a', 'b']), items, 0);
-    expect(JSON.stringify(guessTheMatchEngine.view(s, { memberId: null, role: 'SPECTATOR' }, 5))).not.toMatch(/c2|c3|"correctOptionId":"m2"/);
+    expect(JSON.stringify(guessTheMatchEngine.view(s, { memberId: null, role: 'SPECTATOR' }, 5))).not.toMatch(
+      /c2|c3|"correctOptionId":"m2"/,
+    );
   });
 });
 
@@ -199,7 +227,9 @@ describe('Connections (PROVISIONAL attempts)', () => {
     s = connectionsEngine.act(s, pl('b'), { type: 'answer', text: 'Link 0' }, 200);
     expect(s.phase).toBe('REVIEW');
     expect(connectionsEngine.nextDeadline(s)).toBeNull();
-    expect(() => connectionsEngine.act(s, pl('a'), { type: 'review', memberId: 'a', accept: true }, 300)).toThrow(/Only a judge/);
+    expect(() =>
+      connectionsEngine.act(s, pl('a'), { type: 'review', memberId: 'a', accept: true }, 300),
+    ).toThrow(/Only a judge/);
     const jv = connectionsEngine.view(s, { memberId: 'j', role: 'JUDGE' }, 300) as any;
     expect(jv.reviews).toEqual([{ memberId: 'a', answer: 'alternative' }]);
     s = connectionsEngine.act(s, P('JUDGE', 'j'), { type: 'review', memberId: 'a', accept: true }, 5000);

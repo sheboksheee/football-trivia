@@ -19,7 +19,13 @@ d('PostgreSQL persistence (requires TEST_DATABASE_URL)', () => {
   });
 
   it('persists the append-only log and recovers a room after restart; rotated token still works', async () => {
-    const env = { DATABASE_URL: url, FT_TIME_SCALE: '0.02', LOG_LEVEL: 'silent', ADMIN_TOKEN: 'x'.repeat(16), JOIN_RATE_PER_MINUTE: '1000' } as NodeJS.ProcessEnv;
+    const env = {
+      DATABASE_URL: url,
+      FT_TIME_SCALE: '0.02',
+      LOG_LEVEL: 'silent',
+      ADMIN_TOKEN: 'x'.repeat(16),
+      JOIN_RATE_PER_MINUTE: '1000',
+    } as NodeJS.ProcessEnv;
     const log = pino({ level: 'silent' });
     const app1 = await createApp(loadConfig(env), { log });
     const port1 = await app1.listen(0, '127.0.0.1');
@@ -45,7 +51,10 @@ d('PostgreSQL persistence (requires TEST_DATABASE_URL)', () => {
     const app2 = await createApp(loadConfig(env), { log });
     const port2 = await app2.listen(0, '127.0.0.1');
     const back = await TestClient.connect(port2);
-    const r = await back.send({ type: 'session.resume', payload: { code: host.code, resumeToken: host.token } });
+    const r = await back.send({
+      type: 'session.resume',
+      payload: { code: host.code, resumeToken: host.token },
+    });
     expect(r.ok).toBe(true);
     const v = await back.waitView(() => true);
     expect(v.me.isHost).toBe(true);

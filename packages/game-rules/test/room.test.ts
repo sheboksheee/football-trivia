@@ -1,7 +1,16 @@
 import { describe, expect, it } from 'vitest';
 import type { ContentItem, ModeKey } from '@ft/shared';
 import {
-  advance, createRoom, DEFAULT_TIMING as T, engineFor, gameNow, project, reduce, replay, type RoomEvent, type RoomState,
+  advance,
+  createRoom,
+  DEFAULT_TIMING as T,
+  engineFor,
+  gameNow,
+  project,
+  reduce,
+  replay,
+  type RoomEvent,
+  type RoomState,
 } from '../src/index.js';
 import { hl, gm, mcq } from './fixtures.js';
 
@@ -10,7 +19,16 @@ class Sim {
   s: RoomState;
   t = 0;
   constructor() {
-    const e: RoomEvent = { type: 'create', at: 0, roomId: 'r1', code: 'ABCDEF', seed: 99, timing: T, memberId: 'h', name: 'Host' };
+    const e: RoomEvent = {
+      type: 'create',
+      at: 0,
+      roomId: 'r1',
+      code: 'ABCDEF',
+      seed: 99,
+      timing: T,
+      memberId: 'h',
+      name: 'Host',
+    };
     this.events.push(e);
     this.s = createRoom(e);
   }
@@ -45,7 +63,8 @@ class Sim {
     return this.cmd('h', { type: 'room.configure', payload: { preset, modes } });
   }
   readyAll() {
-    for (const m of this.s.members.filter((x) => x.role === 'PLAYER' && !x.left)) this.cmd(m.id, { type: 'room.ready', payload: { ready: true } });
+    for (const m of this.s.members.filter((x) => x.role === 'PLAYER' && !x.left))
+      this.cmd(m.id, { type: 'room.ready', payload: { ready: true } });
     return this;
   }
   start(content: ContentItem[][], tiebreak = Array.from({ length: 5 }, (_, i) => mcq(100 + i))) {
@@ -84,14 +103,20 @@ describe('room lifecycle', () => {
     expect(r.view('h').startIssues.join()).toMatch(/at least 2/);
     r.join('b');
     expect(r.try(() => r.configure(['who_am_i']))).toMatch(/not playable/);
-    expect(r.try(() => r.cmd('h', { type: 'room.configure', payload: { preset: 'MARATHON', modes: ['higher_lower'] } }))).toMatch(/exactly 12/);
+    expect(
+      r.try(() =>
+        r.cmd('h', { type: 'room.configure', payload: { preset: 'MARATHON', modes: ['higher_lower'] } }),
+      ),
+    ).toMatch(/exactly 12/);
     r.configure(['buzzer']);
     expect(r.view('h').startIssues.join()).toMatch(/neutral judge/);
     r.configure(['impostor']);
     expect(r.view('h').startIssues.join()).toMatch(/3\+ players/);
     r.configure(['higher_lower']);
     expect(r.try(() => r.start([HL]))).toMatch(/Waiting for/);
-    expect(r.try(() => r.cmd('b', { type: 'room.configure', payload: { preset: 'SINGLE', modes: ['timeline'] } }))).toMatch(/Only the host/);
+    expect(
+      r.try(() => r.cmd('b', { type: 'room.configure', payload: { preset: 'SINGLE', modes: ['timeline'] } })),
+    ).toMatch(/Only the host/);
   });
 
   it('ready check resets ready flags; a new player returns the room to the lobby', () => {
@@ -117,7 +142,10 @@ describe('room lifecycle', () => {
 describe('host migration', () => {
   it('after 30s grace transfers to co-host (in game), original host does not regain host', () => {
     const r = new Sim().join('b').join('c');
-    r.cmd('h', { type: 'room.configure', payload: { preset: 'SINGLE', modes: ['higher_lower'], coHostId: 'c' } });
+    r.cmd('h', {
+      type: 'room.configure',
+      payload: { preset: 'SINGLE', modes: ['higher_lower'], coHostId: 'c' },
+    });
     r.readyAll().start([HL]);
     r.at(100).push({ type: 'disconnect', at: 100, memberId: 'h' });
     r.tick(100 + T.reconnectGrace - 1);
@@ -151,7 +179,9 @@ describe('host migration', () => {
   });
   it('host leaving explicitly transfers immediately; non-host cannot transfer host', () => {
     const r = new Sim().join('b');
-    expect(r.try(() => r.cmd('b', { type: 'room.transferHost', payload: { toMemberId: 'b' } }))).toMatch(/Only the host/);
+    expect(r.try(() => r.cmd('b', { type: 'room.transferHost', payload: { toMemberId: 'b' } }))).toMatch(
+      /Only the host/,
+    );
     r.cmd('h', { type: 'room.leave', payload: {} });
     expect(r.s.hostId).toBe('b');
   });
@@ -164,7 +194,8 @@ function playHL(r: Sim, answers: Record<string, string[]>) {
     if (st.phase === 'QUESTION') {
       r.at(r.s.clock.frozenAccum + st.phaseStart + 500);
       for (const [m, list] of Object.entries(answers))
-        if (list[st.index]) r.cmd(m, { type: 'game.action', payload: { action: { type: 'answer', choice: list[st.index] } } });
+        if (list[st.index])
+          r.cmd(m, { type: 'game.action', payload: { action: { type: 'answer', choice: list[st.index] } } });
     }
     const end = (r.run().state as any).phaseEnd;
     r.tick(end === null ? r.t + 1000 : r.s.clock.frozenAccum + end);
@@ -202,9 +233,15 @@ describe('Higher or Lower vertical slice through the room', () => {
     r.cmd('h', { type: 'room.resume', payload: {} });
     // emergency
     expect(r.try(() => r.cmd('h', { type: 'room.pause', payload: { emergency: true } }))).toMatch(/reason/);
-    expect(r.try(() => r.cmd('b', { type: 'room.pause', payload: { emergency: true, reason: 'fire alarm' } }))).toMatch(/Only the host/);
+    expect(
+      r.try(() => r.cmd('b', { type: 'room.pause', payload: { emergency: true, reason: 'fire alarm' } })),
+    ).toMatch(/Only the host/);
     r.cmd('h', { type: 'room.pause', payload: { emergency: true, reason: 'Player power cut' } });
-    expect(r.try(() => r.cmd('b', { type: 'game.action', payload: { action: { type: 'answer', choice: 'HIGHER' } } }))).toMatch(/paused/);
+    expect(
+      r.try(() =>
+        r.cmd('b', { type: 'game.action', payload: { action: { type: 'answer', choice: 'HIGHER' } } }),
+      ),
+    ).toMatch(/paused/);
     expect(r.s.audit.find((a) => a.action === 'pause.emergency')!.detail.reason).toBe('Player power cut');
     // view never reveals the answer while paused mid-question
     r.cmd('h', { type: 'room.resume', payload: {} });
@@ -235,32 +272,70 @@ describe('appeals', () => {
     r.cmd('b', { type: 'appeal.open', payload: { questionIndex: 0, reason: 'QUESTION_INCORRECT' } });
     expect(r.s.appeals[0]!.status).toBe('AUTO_VOIDED');
     expect(engineFor('higher_lower').scores(r.run().state)).toEqual({ h: '0', b: '0' });
-    expect(r.try(() => r.cmd('b', { type: 'appeal.open', payload: { questionIndex: 0, reason: 'QUESTION_INCORRECT' } }))).toMatch(/One appeal/);
+    expect(
+      r.try(() =>
+        r.cmd('b', { type: 'appeal.open', payload: { questionIndex: 0, reason: 'QUESTION_INCORRECT' } }),
+      ),
+    ).toMatch(/One appeal/);
   });
   it('with a judge: freezes the clock until resolved; ACCEPT regrades; window closes after 15s', () => {
     const r = new Sim().join('b').join('j', 'JUDGE').configure(['higher_lower']).readyAll().start([HL]);
     toReveal(r, 'LOWER');
-    r.at(r.t + 1000).cmd('b', { type: 'appeal.open', payload: { questionIndex: 0, reason: 'ANSWER_SHOULD_BE_ACCEPTED', note: 'stat definition' } });
+    r.at(r.t + 1000).cmd('b', {
+      type: 'appeal.open',
+      payload: { questionIndex: 0, reason: 'ANSWER_SHOULD_BE_ACCEPTED', note: 'stat definition' },
+    });
     expect(r.s.clock.reasons).toContain('APPEAL');
     expect(r.view('h').appeals).toHaveLength(0);
     expect(r.view('j', 'JUDGE').appeals[0]!.canResolve).toBe(true);
-    expect(r.try(() => r.cmd('h', { type: 'appeal.resolve', payload: { appealId: r.s.appeals[0]!.id, decision: 'ACCEPT', note: 'ok ok' } }))).toMatch(/neutral judge/);
+    expect(
+      r.try(() =>
+        r.cmd('h', {
+          type: 'appeal.resolve',
+          payload: { appealId: r.s.appeals[0]!.id, decision: 'ACCEPT', note: 'ok ok' },
+        }),
+      ),
+    ).toMatch(/neutral judge/);
     r.tick(r.t + 100_000);
     expect((r.run().state as any).phase).toBe('REVEAL'); // held
-    r.cmd('j', { type: 'appeal.resolve', payload: { appealId: r.s.appeals[0]!.id, decision: 'ACCEPT', note: 'Source supports claim' } });
+    r.cmd('j', {
+      type: 'appeal.resolve',
+      payload: { appealId: r.s.appeals[0]!.id, decision: 'ACCEPT', note: 'Source supports claim' },
+    });
     expect(r.s.clock.reasons).not.toContain('APPEAL');
     expect(engineFor('higher_lower').scores(r.run().state)).toEqual({ h: '2', b: '2' });
     const closes = r.s.clock.frozenAccum + (r.run().state as any).phaseEnd;
     r.tick(closes);
-    expect(r.try(() => r.cmd('h', { type: 'appeal.open', payload: { questionIndex: 0, reason: 'QUESTION_INCORRECT' } }))).toMatch(/closed/);
+    expect(
+      r.try(() =>
+        r.cmd('h', { type: 'appeal.open', payload: { questionIndex: 0, reason: 'QUESTION_INCORRECT' } }),
+      ),
+    ).toMatch(/closed/);
   });
   it('a judge who graded the answer cannot adjudicate its appeal (conflict of interest)', () => {
     const r = new Sim().join('b').join('j', 'JUDGE').configure(['connections']).readyAll();
-    const items = Array.from({ length: 8 }, (_, i) => ({ kind: 'connection', meta: hl(i, 1, 2).meta, entities: ['a', 'b', 'c', 'd'], link: 'Link', aliases: [], explanation: '' }) as ContentItem);
+    const items = Array.from(
+      { length: 8 },
+      (_, i) =>
+        ({
+          kind: 'connection',
+          meta: hl(i, 1, 2).meta,
+          entities: ['a', 'b', 'c', 'd'],
+          link: 'Link',
+          aliases: [],
+          explanation: '',
+        }) as ContentItem,
+    );
     r.start([items]).skipIntro();
-    r.at(r.t + 10).cmd('b', { type: 'game.action', payload: { action: { type: 'answer', text: 'other idea' } } });
+    r.at(r.t + 10).cmd('b', {
+      type: 'game.action',
+      payload: { action: { type: 'answer', text: 'other idea' } },
+    });
     r.cmd('h', { type: 'game.action', payload: { action: { type: 'answer', text: 'link' } } });
-    r.cmd('j', { type: 'game.action', payload: { action: { type: 'review', memberId: 'b', accept: false } } });
+    r.cmd('j', {
+      type: 'game.action',
+      payload: { action: { type: 'review', memberId: 'b', accept: false } },
+    });
     r.cmd('b', { type: 'appeal.open', payload: { questionIndex: 0, reason: 'ANSWER_SHOULD_BE_ACCEPTED' } });
     // only judge is the grader -> no eligible reviewer -> auto void
     expect(r.s.appeals[0]!.status).toBe('AUTO_VOIDED');
@@ -317,7 +392,10 @@ describe('Match Night end to end', () => {
     r.configure(['higher_lower']).readyAll().start([HL]);
     playHL(r, {});
     r.tick(r.t + T.modeResults);
-    r.at(r.t + 100).cmd('b', { type: 'game.action', payload: { action: { type: 'answer', optionId: 'o1' } } });
+    r.at(r.t + 100).cmd('b', {
+      type: 'game.action',
+      payload: { action: { type: 'answer', optionId: 'o1' } },
+    });
     r.cmd('h', { type: 'game.action', payload: { action: { type: 'answer', optionId: 'o3' } } });
     let guard = 0;
     while (r.s.status !== 'COMPLETED' && guard++ < 10) r.tick(r.t + 20_000);
@@ -343,8 +421,16 @@ describe('Match Night end to end', () => {
     const v = JSON.stringify(r.view('spec', 'SPECTATOR'));
     expect(v).not.toMatch(/"value":2/); // B value of item 0
     expect(r.view('spec', 'SPECTATOR').me!.role).toBe('SPECTATOR');
-    expect(r.try(() => r.cmd('spec', { type: 'game.action', payload: { action: { type: 'answer', choice: 'HIGHER' } } }))).toMatch(/Spectators/);
-    expect(r.try(() => r.cmd('spec', { type: 'appeal.open', payload: { questionIndex: 0, reason: 'QUESTION_INCORRECT' } }))).toMatch(/Only players/);
+    expect(
+      r.try(() =>
+        r.cmd('spec', { type: 'game.action', payload: { action: { type: 'answer', choice: 'HIGHER' } } }),
+      ),
+    ).toMatch(/Spectators/);
+    expect(
+      r.try(() =>
+        r.cmd('spec', { type: 'appeal.open', payload: { questionIndex: 0, reason: 'QUESTION_INCORRECT' } }),
+      ),
+    ).toMatch(/Only players/);
   });
 
   it('advance is idempotent and time-order independent', () => {

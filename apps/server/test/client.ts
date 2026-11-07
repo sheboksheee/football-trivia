@@ -25,10 +25,11 @@ export class TestClient {
         c.token = m.resumeToken;
         c.code = m.roomCode;
       }
-      for (const w of [...c.waiters]) if (w.pred(m)) {
-        c.waiters.splice(c.waiters.indexOf(w), 1);
-        w.ok(m);
-      }
+      for (const w of [...c.waiters])
+        if (w.pred(m)) {
+          c.waiters.splice(c.waiters.indexOf(w), 1);
+          w.ok(m);
+        }
     });
     return c;
   }

@@ -10,11 +10,13 @@ import { Game } from './Game.js';
 export function Room({ code, go }: { code: string; go: (r: string) => void }) {
   const { t } = useI18n();
   const snap = useGame();
-  const [state, setState] = useState<'loading' | 'needJoin' | 'error' | 'ready'>(snap.view && snap.roomCode === code ? 'ready' : 'loading');
+  const bound = snap.roomCode === code && snap.memberId !== null;
+  const [state, setState] = useState<'loading' | 'needJoin' | 'error' | 'ready'>(bound ? 'ready' : 'loading');
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
-    if (snap.view && snap.roomCode === code) return setState('ready');
+    // Already bound on this socket (just created/joined): the state message is on its way.
+    if (bound) return setState('ready');
     let alive = true;
     (async () => {
       try {
@@ -41,7 +43,15 @@ export function Room({ code, go }: { code: string; go: (r: string) => void }) {
     return (
       <div className="stack" style={{ maxWidth: 480, margin: '0 auto' }}>
         <Banner tone="warn">{snap.kicked}</Banner>
-        <button className="btn" onClick={() => { client.clearKick(); go('#/'); }}>{t('newGame')}</button>
+        <button
+          className="btn"
+          onClick={() => {
+            client.clearKick();
+            go('#/');
+          }}
+        >
+          {t('newGame')}
+        </button>
       </div>
     );
   }
@@ -50,7 +60,9 @@ export function Room({ code, go }: { code: string; go: (r: string) => void }) {
       <div className="stack" style={{ maxWidth: 480, margin: '0 auto' }}>
         {err && <Banner tone="warn">{err}</Banner>}
         <Banner>You’re not in room {code} on this device yet.</Banner>
-        <button className="btn primary" onClick={() => go(`#/join/${code}`)}>{t('join')} {code}</button>
+        <button className="btn primary" onClick={() => go(`#/join/${code}`)}>
+          {t('join')} {code}
+        </button>
       </div>
     );
   }
@@ -58,7 +70,9 @@ export function Room({ code, go }: { code: string; go: (r: string) => void }) {
     return (
       <div className="stack" style={{ maxWidth: 480, margin: '0 auto' }}>
         <Banner tone="bad">Cannot reach the game server.</Banner>
-        <button className="btn" onClick={() => location.reload()}>{t('tryAgain')}</button>
+        <button className="btn" onClick={() => location.reload()}>
+          {t('tryAgain')}
+        </button>
       </div>
     );
   }
@@ -72,15 +86,36 @@ export function Room({ code, go }: { code: string; go: (r: string) => void }) {
       </div>
     );
   }
-  const inLobby = view.room.status === 'LOBBY' || view.room.status === 'READY_CHECK' || (view.room.status === 'SUSPENDED' && !view.matchNight);
+  const inLobby =
+    view.room.status === 'LOBBY' ||
+    view.room.status === 'READY_CHECK' ||
+    (view.room.status === 'SUSPENDED' && !view.matchNight);
   return (
     <div className="stack">
-      {snap.status !== 'online' && <Banner tone="warn">{t('reconnecting')} Your seat is held for 30 seconds; answer timers do not pause for disconnects.</Banner>}
+      {snap.status !== 'online' && (
+        <Banner tone="warn">
+          {t('reconnecting')} Your seat is held for 30 seconds; answer timers do not pause for disconnects.
+        </Banner>
+      )}
       {inLobby ? <Lobby view={view} /> : <Game view={view} />}
       {view.room.status !== 'COMPLETED' && (
         <div className="row">
           <span className="spacer" />
-          <button className="btn ghost sm" onClick={async () => { if (confirm(view.matchNight ? 'Leave during play? You forfeit future modes but keep completed-mode points.' : 'Leave this room?')) { await client.leave(); go('#/'); } }}>
+          <button
+            className="btn ghost sm"
+            onClick={async () => {
+              if (
+                confirm(
+                  view.matchNight
+                    ? 'Leave during play? You forfeit future modes but keep completed-mode points.'
+                    : 'Leave this room?',
+                )
+              ) {
+                await client.leave();
+                go('#/');
+              }
+            }}
+          >
             {t('leave')}
           </button>
         </div>

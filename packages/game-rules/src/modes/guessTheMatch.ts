@@ -24,7 +24,8 @@ export const guessTheMatchEngine = makeSimultaneousEngine<GuessMatchItem, GmAnsw
   milestones: (s) => s.timing.guessMatchClues.map((t) => s.phaseStart + t),
   parseAnswer(s, item, _m, action, now) {
     const id = action.optionId;
-    if (typeof id !== 'string' || !item.options.some((o) => o.id === id)) throw new GameError('INVALID_MESSAGE', 'Unknown option');
+    if (typeof id !== 'string' || !item.options.some((o) => o.id === id))
+      throw new GameError('INVALID_MESSAGE', 'Unknown option');
     return { at: now, optionId: id, tier: Math.max(1, visibleClues(s, now)) };
   },
   grade: (item, ans) => ans !== undefined && ans.optionId === item.correctOptionId,

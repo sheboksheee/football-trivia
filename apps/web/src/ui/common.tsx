@@ -18,14 +18,26 @@ export function memberColor(view: RoomView | null, id: string): string {
 export function Avatar({ id, name, size = 36 }: { id: string; name: string; size?: number }) {
   const { view } = useGame();
   return (
-    <span className="avatar" aria-hidden="true" style={{ background: memberColor(view, id), width: size, height: size, fontSize: size * 0.48 }}>
+    <span
+      className="avatar"
+      aria-hidden="true"
+      style={{ background: memberColor(view, id), width: size, height: size, fontSize: size * 0.48 }}
+    >
       {name.slice(0, 1).toUpperCase()}
     </span>
   );
 }
 
 /** Server-driven countdown. Turns amber when the server clock is frozen (pause / appeal hold). */
-export function Timer({ end, start, label }: { end: number | null | undefined; start?: number | null; label?: string }) {
+export function Timer({
+  end,
+  start,
+  label,
+}: {
+  end: number | null | undefined;
+  start?: number | null;
+  label?: string;
+}) {
   const { view } = useGame();
   const rem = useRemaining(end);
   if (rem === null || end === null || end === undefined) return null;
@@ -35,7 +47,12 @@ export function Timer({ end, start, label }: { end: number | null | undefined; s
   const low = rem < 3000 && !frozen;
   const secs = Math.ceil(rem / 1000);
   return (
-    <div className="row" style={{ flexWrap: 'nowrap', gap: 12 }} role="timer" aria-label={`${label ?? 'Time left'}: ${secs} seconds${frozen ? ' (paused)' : ''}`}>
+    <div
+      className="row"
+      style={{ flexWrap: 'nowrap', gap: 12 }}
+      role="timer"
+      aria-label={`${label ?? 'Time left'}: ${secs} seconds${frozen ? ' (paused)' : ''}`}
+    >
       <div className={`timer ${low ? 'low' : ''} ${frozen ? 'frozen' : ''}`} style={{ flex: 1 }}>
         <i style={{ width: `${pct}%` }} />
       </div>
@@ -55,14 +72,28 @@ export function formatPoints(s: string | undefined): string {
   }
 }
 
-export function ScoreStrip({ scores, players, highlight }: { scores: Record<string, string>; players: string[]; highlight?: string | null }) {
+export function ScoreStrip({
+  scores,
+  players,
+  highlight,
+}: {
+  scores: Record<string, string>;
+  players: string[];
+  highlight?: string | null;
+}) {
   const { view, memberId } = useGame();
   const names = memberNames(view);
-  const sorted = [...players].sort((a, b) => Fraction.parse(scores[b] ?? '0').cmp(Fraction.parse(scores[a] ?? '0')));
+  const sorted = [...players].sort((a, b) =>
+    Fraction.parse(scores[b] ?? '0').cmp(Fraction.parse(scores[a] ?? '0')),
+  );
   return (
     <div className="scorestrip" aria-label="Scores">
       {sorted.map((p) => (
-        <div key={p} className={`scorechip ${p === memberId ? 'me' : ''}`} style={highlight === p ? { borderColor: 'var(--info)' } : undefined}>
+        <div
+          key={p}
+          className={`scorechip ${p === memberId ? 'me' : ''}`}
+          style={highlight === p ? { borderColor: 'var(--info)' } : undefined}
+        >
           <Avatar id={p} name={names[p] ?? '?'} size={32} />
           <span className="small truncate" style={{ maxWidth: 110 }}>
             {names[p] ?? '—'}
@@ -74,7 +105,15 @@ export function ScoreStrip({ scores, players, highlight }: { scores: Record<stri
   );
 }
 
-export function Banner({ tone = 'info', children, icon }: { tone?: 'info' | 'warn' | 'bad' | 'ok'; children: ReactNode; icon?: string }) {
+export function Banner({
+  tone = 'info',
+  children,
+  icon,
+}: {
+  tone?: 'info' | 'warn' | 'bad' | 'ok';
+  children: ReactNode;
+  icon?: string;
+}) {
   return (
     <div className={`banner ${tone}`} role={tone === 'bad' ? 'alert' : 'status'}>
       {icon && <span aria-hidden="true">{icon}</span>}
@@ -104,7 +143,15 @@ export function ErrorToast() {
   );
 }
 
-export function Modal({ title, children, onClose }: { title: string; children: ReactNode; onClose: () => void }) {
+export function Modal({
+  title,
+  children,
+  onClose,
+}: {
+  title: string;
+  children: ReactNode;
+  onClose: () => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const prev = document.activeElement as HTMLElement | null;
@@ -118,7 +165,14 @@ export function Modal({ title, children, onClose }: { title: string; children: R
   }, [onClose]);
   return (
     <div className="modal-backdrop" onClick={onClose}>
-      <div className="modal card" role="dialog" aria-modal="true" aria-label={title} ref={ref} onClick={(e) => e.stopPropagation()}>
+      <div
+        className="modal card"
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        ref={ref}
+        onClick={(e) => e.stopPropagation()}
+      >
         <h2 className="display h3 card-title">{title}</h2>
         {children}
       </div>
@@ -129,7 +183,13 @@ export function Modal({ title, children, onClose }: { title: string; children: R
 export function ConnectionBadge() {
   const { status } = useGame();
   const { t } = useI18n();
-  const map = { online: ['ok', t('online')], connecting: ['warn', t('reconnecting')], reconnecting: ['warn', t('reconnecting')], offline: ['bad', t('offline')], idle: ['', ''] } as const;
+  const map = {
+    online: ['ok', t('online')],
+    connecting: ['warn', t('reconnecting')],
+    reconnecting: ['warn', t('reconnecting')],
+    offline: ['bad', t('offline')],
+    idle: ['', ''],
+  } as const;
   const [tone, label] = map[status];
   if (!label) return null;
   return (
@@ -148,7 +208,11 @@ export function Empty({ title, children }: { title: string; children?: ReactNode
   return (
     <div className="card" style={{ textAlign: 'center', padding: 28 }}>
       <div className="display h3">{title}</div>
-      {children && <div className="muted" style={{ marginTop: 8 }}>{children}</div>}
+      {children && (
+        <div className="muted" style={{ marginTop: 8 }}>
+          {children}
+        </div>
+      )}
     </div>
   );
 }

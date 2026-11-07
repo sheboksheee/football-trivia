@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import {
-  auctionEngine, buzzerEngine, DEFAULT_TIMING as T, duelPoints, impostorEngine, isCaught, riskItEngine,
-  riskPoints, snakeOrder, timelineEngine, timelinePairings, top25Engine,
+  auctionEngine,
+  buzzerEngine,
+  DEFAULT_TIMING as T,
+  duelPoints,
+  impostorEngine,
+  isCaught,
+  riskItEngine,
+  riskPoints,
+  snakeOrder,
+  timelineEngine,
+  timelinePairings,
+  top25Engine,
 } from '../src/index.js';
 import { auction, ctx, imp, mcq, P, runTo, shortA, tl, top25 } from './fixtures.js';
 
@@ -34,7 +44,10 @@ describe('Risk It (PROVISIONAL turn order/defaults)', () => {
     s = riskItEngine.act(s, pl('a'), { type: 'answer', optionId: 'o1' }, s.phaseStart + 1);
     expect(riskItEngine.scores(s).a).toBe('0');
     // ACCEPT on turn 0 regrades ALL IN wrong -> +6
-    expect(riskItEngine.scores(riskItEngine.adjudicate(s, { itemIndex: 0, claimantId: 'a', decision: 'ACCEPT' })).a).toBe('9');
+    expect(
+      riskItEngine.scores(riskItEngine.adjudicate(s, { itemIndex: 0, claimantId: 'a', decision: 'ACCEPT' }))
+        .a,
+    ).toBe('9');
     s = runTo(riskItEngine, s, 1e9);
     expect(riskItEngine.finished(s)).toBe(true);
   });
@@ -42,7 +55,9 @@ describe('Risk It (PROVISIONAL turn order/defaults)', () => {
     const s = riskItEngine.init(ctx(['a', 'b']), [mcq(0), mcq(1)], 0);
     expect((riskItEngine.view(s, { memberId: 'b', role: 'PLAYER' }, 1) as any).item).toBeNull();
     const s2 = riskItEngine.act(s, pl('a'), { type: 'risk', risk: 'SAFE' }, 1);
-    expect((riskItEngine.view(s2, { memberId: 'b', role: 'PLAYER' }, 2) as any).item.correctOptionId).toBeNull();
+    expect(
+      (riskItEngine.view(s2, { memberId: 'b', role: 'PLAYER' }, 2) as any).item.correctOptionId,
+    ).toBeNull();
   });
 });
 
@@ -64,12 +79,23 @@ describe('Timeline duels', () => {
       }
       expect(pairs.every(([a, b]) => a !== b)).toBe(true);
     }
-    expect(timelinePairings(['a', 'b'])).toEqual([['a', 'b'], ['b', 'a'], ['a', 'b'], ['b', 'a']]);
+    expect(timelinePairings(['a', 'b'])).toEqual([
+      ['a', 'b'],
+      ['b', 'a'],
+      ['a', 'b'],
+      ['b', 'a'],
+    ]);
   });
   it('8s answer window, only duelists answer, picks hidden until reveal', () => {
-    let s = timelineEngine.init(ctx(['a', 'b', 'c']), Array.from({ length: 6 }, (_, i) => tl(i)), 0);
+    let s = timelineEngine.init(
+      ctx(['a', 'b', 'c']),
+      Array.from({ length: 6 }, (_, i) => tl(i)),
+      0,
+    );
     s = timelineEngine.step(s, T.timelineIntro);
-    expect(() => timelineEngine.act(s, pl('c'), { type: 'pick', eventId: 'e1' }, 3001)).toThrow(/not in this duel/);
+    expect(() => timelineEngine.act(s, pl('c'), { type: 'pick', eventId: 'e1' }, 3001)).toThrow(
+      /not in this duel/,
+    );
     s = timelineEngine.act(s, pl('a'), { type: 'pick', eventId: 'e1' }, 3001);
     expect((timelineEngine.view(s, { memberId: 'b', role: 'PLAYER' }, 3002) as any).picks.a).toBe('HIDDEN');
     s = timelineEngine.step(s, s.phaseEnd!); // b times out
@@ -89,7 +115,9 @@ describe('TOP 25 (PROVISIONAL end conditions)', () => {
       s = top25Engine.step(s, s.phaseEnd!);
     };
     guess('a', 'Name 25'); // 25
-    expect(() => top25Engine.act(s, pl('a'), { type: 'guess', text: 'x' }, s.phaseStart + 1)).toThrow(/Not your turn/);
+    expect(() => top25Engine.act(s, pl('a'), { type: 'guess', text: 'x' }, s.phaseStart + 1)).toThrow(
+      /Not your turn/,
+    );
     guess('b', 'name 25'); // duplicate
     expect(s.guesses[1]!.duplicate).toBe(true);
     // round 1 is reversed: b then a
@@ -112,8 +140,12 @@ describe('TOP 25 (PROVISIONAL end conditions)', () => {
     s = top25Engine.act(s, pl('a'), { type: 'guess', text: 'Nam 5' }, 10);
     const v = JSON.stringify(top25Engine.view(s, { memberId: null, role: 'SPECTATOR' }, 11));
     expect(v).not.toContain('Name ');
-    expect(top25Engine.appealWindows(s, 11)).toEqual([{ itemIndex: 0, closesAt: 10 + T.appealWindow, eligible: ['a'] }]);
-    expect(() => top25Engine.adjudicate(s, { itemIndex: 0, claimantId: 'a', decision: 'ACCEPT' })).toThrow(/rank/);
+    expect(top25Engine.appealWindows(s, 11)).toEqual([
+      { itemIndex: 0, closesAt: 10 + T.appealWindow, eligible: ['a'] },
+    ]);
+    expect(() => top25Engine.adjudicate(s, { itemIndex: 0, claimantId: 'a', decision: 'ACCEPT' })).toThrow(
+      /rank/,
+    );
     const acc = top25Engine.adjudicate(s, { itemIndex: 0, claimantId: 'a', decision: 'ACCEPT', detail: 5 });
     expect(top25Engine.scores(acc).a).toBe('5');
   });
@@ -136,8 +168,12 @@ describe('Buzzer Battle (judge required)', () => {
     let s = buzzerEngine.init(ctx(['a', 'b', 'c'], ['j']), items, 0);
     s = buzzerEngine.act(s, pl('b'), { type: 'buzz' }, 1000);
     expect(() => buzzerEngine.act(s, pl('a'), { type: 'buzz' }, 1001)).toThrow(/closed/); // deterministic: b first
-    expect(() => buzzerEngine.act(s, pl('b'), { type: 'verdict', verdict: 'CORRECT' }, 1500)).toThrow(/Only the judge/);
-    expect(() => buzzerEngine.act(s, judge, { type: 'verdict', verdict: 'TIMEOUT' }, 2000)).toThrow(/not expired/);
+    expect(() => buzzerEngine.act(s, pl('b'), { type: 'verdict', verdict: 'CORRECT' }, 1500)).toThrow(
+      /Only the judge/,
+    );
+    expect(() => buzzerEngine.act(s, judge, { type: 'verdict', verdict: 'TIMEOUT' }, 2000)).toThrow(
+      /not expired/,
+    );
     s = buzzerEngine.act(s, judge, { type: 'verdict', verdict: 'WRONG' }, 3000);
     expect(s.phase).toBe('OPEN');
     expect(() => buzzerEngine.act(s, pl('b'), { type: 'buzz' }, 3001)).toThrow(/Already used/);
@@ -162,13 +198,16 @@ describe('Buzzer Battle (judge required)', () => {
     const s = buzzerEngine.init(ctx(['a', 'b'], ['j']), items, 0);
     expect((buzzerEngine.view(s, { memberId: 'j', role: 'JUDGE' }, 1) as any).answer).toBe('Answer 0');
     expect((buzzerEngine.view(s, { memberId: 'a', role: 'PLAYER' }, 1) as any).answer).toBeNull();
-    expect(JSON.stringify(buzzerEngine.view(s, { memberId: null, role: 'SPECTATOR' }, 1))).not.toContain('Answer 0');
+    expect(JSON.stringify(buzzerEngine.view(s, { memberId: null, role: 'SPECTATOR' }, 1))).not.toContain(
+      'Answer 0',
+    );
   });
 });
 
 describe('The Impostor', () => {
   const items = Array.from({ length: 3 }, (_, i) => imp(i));
-  it('needs 3+ players', () => expect(() => impostorEngine.init(ctx(['a', 'b']), items, 0)).toThrow(/3 players/));
+  it('needs 3+ players', () =>
+    expect(() => impostorEngine.init(ctx(['a', 'b']), items, 0)).toThrow(/3 players/));
   it('caught = strictly most votes', () => {
     expect(isCaught({ a: 'c', b: 'c', c: 'a' }, 'c')).toBe(true);
     expect(isCaught({ a: 'c', b: 'a', c: 'b' }, 'c')).toBe(false); // 3-way tie
@@ -196,13 +235,19 @@ describe('The Impostor', () => {
     // reveal 15s, 2 cycles x 3 players x 10s, discussion 45s
     s = runTo(impostorEngine, s, T.impostorReveal + 6 * T.impostorClue + T.impostorDiscussion);
     expect(s.phase).toBe('VOTE');
-    expect(() => impostorEngine.act(s, pl(crew[0]!), { type: 'vote', target: crew[0] }, s.phaseStart + 1)).toThrow(/yourself/);
+    expect(() =>
+      impostorEngine.act(s, pl(crew[0]!), { type: 'vote', target: crew[0] }, s.phaseStart + 1),
+    ).toThrow(/yourself/);
     s = impostorEngine.act(s, pl(crew[0]!), { type: 'vote', target: impostor }, s.phaseStart + 1);
-    expect((impostorEngine.view(s, { memberId: crew[1]!, role: 'PLAYER' }, s.phaseStart + 2) as any).votes).toBeNull();
+    expect(
+      (impostorEngine.view(s, { memberId: crew[1]!, role: 'PLAYER' }, s.phaseStart + 2) as any).votes,
+    ).toBeNull();
     s = impostorEngine.act(s, pl(crew[1]!), { type: 'vote', target: impostor }, s.phaseStart + 2);
     s = impostorEngine.act(s, pl(impostor), { type: 'vote', target: crew[0] }, s.phaseStart + 3);
     expect(s.phase).toBe('GUESS');
-    expect((impostorEngine.view(s, { memberId: impostor, role: 'PLAYER' }, s.phaseStart + 1) as any).footballer).toBeNull();
+    expect(
+      (impostorEngine.view(s, { memberId: impostor, role: 'PLAYER' }, s.phaseStart + 1) as any).footballer,
+    ).toBeNull();
     s = impostorEngine.act(s, pl(impostor), { type: 'guess', text: 's0' }, s.phaseStart + 1);
     expect(s.phase).toBe('ROUND_REVEAL');
     const sc = impostorEngine.scores(s);
@@ -214,7 +259,11 @@ describe('The Impostor', () => {
     let s = impostorEngine.init(ctx(['a', 'b', 'c'], [], 7), items, 0);
     expect(new Set(s.rounds.map((r) => r.impostor)).size).toBe(3);
     const impostor = s.rounds[0]!.impostor;
-    s = runTo(impostorEngine, s, T.impostorReveal + 6 * T.impostorClue + T.impostorDiscussion + T.impostorVote);
+    s = runTo(
+      impostorEngine,
+      s,
+      T.impostorReveal + 6 * T.impostorClue + T.impostorDiscussion + T.impostorVote,
+    );
     expect(s.phase).toBe('ROUND_REVEAL');
     expect(impostorEngine.scores(s)[impostor]).toBe('4');
   });
@@ -258,7 +307,11 @@ describe('Football Auction + 30 Seconds (judge required)', () => {
     expect(s.rounds[0]!.outcome).toBe('FAILURE');
     expect(auctionEngine.scores(s)).toEqual({ a: '-2', b: '0', c: '5' });
     // appeal by bidder accepted flips to success
-    expect(auctionEngine.scores(auctionEngine.adjudicate(s, { itemIndex: 0, claimantId: 'a', decision: 'ACCEPT' }))).toEqual({ a: '5', b: '0', c: '0' });
+    expect(
+      auctionEngine.scores(
+        auctionEngine.adjudicate(s, { itemIndex: 0, claimantId: 'a', decision: 'ACCEPT' }),
+      ),
+    ).toEqual({ a: '5', b: '0', c: '0' });
     expect(auctionEngine.gradedBy(s, 0, 'a')).toBe('j');
   });
   it('a max bid ends bidding immediately', () => {

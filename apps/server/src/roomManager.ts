@@ -1,11 +1,25 @@
 import { createHmac, randomInt, timingSafeEqual } from 'node:crypto';
 import {
-  ClientCommand, ClientEnvelope, GameError, generateInviteCode, newId, newSecretToken,
-  type AckMessage, type ServerMessage,
+  ClientCommand,
+  ClientEnvelope,
+  GameError,
+  generateInviteCode,
+  newId,
+  newSecretToken,
+  type AckMessage,
+  type ServerMessage,
 } from '@ft/shared';
 import {
-  activeMembers, createRoom, nextDeadline, project, reduce, replay, validateStart,
-  type RoomEvent, type RoomState, type Timing,
+  activeMembers,
+  createRoom,
+  nextDeadline,
+  project,
+  reduce,
+  replay,
+  validateStart,
+  type RoomEvent,
+  type RoomState,
+  type Timing,
 } from '@ft/game-rules';
 import type { Persistence } from './persistence.js';
 import type { ContentService } from './contentService.js';
@@ -62,7 +76,10 @@ export class RoomManager {
     this.now = o.now ?? Date.now;
     const rate = o.joinRatePerMinute ?? 10;
     this.joinLimiter = new KeyedLimiter(rate, rate / 60);
-    o.metrics.gauge('ft_rooms_active', () => [...this.rooms.values()].filter((r) => r.state.status !== 'COMPLETED').length);
+    o.metrics.gauge(
+      'ft_rooms_active',
+      () => [...this.rooms.values()].filter((r) => r.state.status !== 'COMPLETED').length,
+    );
     o.metrics.gauge('ft_connections', () => [...this.rooms.values()].reduce((a, r) => a + r.conns.size, 0));
   }
 
@@ -86,8 +103,13 @@ export class RoomManager {
         const state = replay(r.events);
         const room = this.addRoom(state, r.events.length);
         for (const s of r.sessions) room.tokens.set(s.memberId, s.tokenHash);
-        room.persisted = { audit: state.audit.length, results: state.matchNight?.results.length ?? 0, record: false };
-        for (const m of activeMembers(state).filter((x) => x.connected)) this.applyEvent(room, { type: 'disconnect', at: this.now(), memberId: m.id }, null, null);
+        room.persisted = {
+          audit: state.audit.length,
+          results: state.matchNight?.results.length ?? 0,
+          record: false,
+        };
+        for (const m of activeMembers(state).filter((x) => x.connected))
+          this.applyEvent(room, { type: 'disconnect', at: this.now(), memberId: m.id }, null, null);
         this.o.log.info({ roomId: r.roomId, events: r.events.length }, 'room recovered from event log');
       } catch (e) {
         this.o.log.error({ err: e, roomId: r.roomId }, 'room recovery failed');
@@ -96,7 +118,17 @@ export class RoomManager {
   }
 
   private addRoom(state: RoomState, seq: number): Room {
-    const room: Room = { state, seq, conns: new Set(), tokens: new Map(), idem: new Map(), timer: null, persisted: { audit: 0, results: 0, record: false }, queue: Promise.resolve(), usedQuestions: new Set() };
+    const room: Room = {
+      state,
+      seq,
+      conns: new Set(),
+      tokens: new Map(),
+      idem: new Map(),
+      timer: null,
+      persisted: { audit: 0, results: 0, record: false },
+      queue: Promise.resolve(),
+      usedQuestions: new Set(),
+    };
     this.rooms.set(state.id, room);
     this.codes.set(state.code, state.id);
     return room;
@@ -116,7 +148,13 @@ export class RoomManager {
       return this.reject(conn, 'unknown', 'INVALID_MESSAGE', 'Malformed envelope');
     }
     const parsed = ClientCommand.safeParse(env.command);
-    if (!parsed.success) return this.reject(conn, env.id, 'INVALID_MESSAGE', parsed.error.issues[0]?.message ?? 'Invalid command');
+    if (!parsed.success)
+      return this.reject(
+        conn,
+        env.id,
+        'INVALID_MESSAGE',
+        parsed.error.issues[0]?.message ?? 'Invalid command',
+      );
     try {
       this.dispatch(conn, env, parsed.data);
     } catch (e) {
@@ -126,7 +164,12 @@ export class RoomManager {
     }
   }
 
-  private reject(conn: Conn, id: string, code: AckMessage['error'] extends infer E ? E extends { code: infer C } ? C : never : never, message: string) {
+  private reject(
+    conn: Conn,
+    id: string,
+    code: AckMessage['error'] extends infer E ? (E extends { code: infer C } ? C : never) : never,
+    message: string,
+  ) {
     this.o.metrics.inc('ft_commands_rejected_total', { code });
     conn.send({ t: 'ack', id, ok: false, error: { code, message } });
     void this.o.db.rejectCommand(conn.roomId, conn.memberId, id, code, message).catch(() => {});
@@ -136,9 +179,11 @@ export class RoomManager {
     if (cmd.type === 'ping') return conn.send({ t: 'pong', serverNow: this.now() });
     if (cmd.type === 'room.create' || cmd.type === 'room.join' || cmd.type === 'session.resume') {
       if (conn.roomId) throw new GameError('INVALID_STATE', 'Already in a room on this connection');
-      if (!this.joinLimiter.take(conn.ip, this.now())) throw new GameError('RATE_LIMITED', 'Too many join attempts; wait a minute');
+      if (!this.joinLimiter.take(conn.ip, this.now()))
+        throw new GameError('RATE_LIMITED', 'Too many join attempts; wait a minute');
       if (cmd.type === 'room.create') return this.create(conn, env.id, cmd.payload.displayName);
-      if (cmd.type === 'room.join') return this.join(conn, env.id, cmd.payload.code, cmd.payload.displayName, cmd.payload.role);
+      if (cmd.type === 'room.join')
+        return this.join(conn, env.id, cmd.payload.code, cmd.payload.displayName, cmd.payload.role);
       return this.resume(conn, env.id, cmd.payload.code.toUpperCase(), cmd.payload.resumeToken);
     }
     const room = conn.roomId ? this.rooms.get(conn.roomId) : undefined;
@@ -146,17 +191,37 @@ export class RoomManager {
     const idemKey = `${conn.memberId}:${env.id}`;
     const prev = room.idem.get(idemKey);
     if (prev) return conn.send({ ...prev, duplicate: true });
-    if (env.expectedVersion !== undefined && env.expectedVersion !== room.state.version && (cmd.type === 'room.configure' || cmd.type === 'room.start' || cmd.type === 'room.readyCheck'))
+    if (
+      env.expectedVersion !== undefined &&
+      env.expectedVersion !== room.state.version &&
+      (cmd.type === 'room.configure' || cmd.type === 'room.start' || cmd.type === 'room.readyCheck')
+    )
       throw new GameError('STALE_VERSION', 'Room changed; review and try again');
     const at = this.now();
     let event: RoomEvent;
     if (cmd.type === 'room.start') {
       validateStart(room.state, conn.memberId);
       const players = activeMembers(room.state).filter((m) => m.role === 'PLAYER').length;
-      const drawn = this.o.content.drawForMatch(room.state.playlist.modes, players, room.state.seed, room.usedQuestions);
-      event = { type: 'start', at, actorId: conn.memberId, content: drawn.content, tiebreakContent: drawn.tiebreak };
+      const drawn = this.o.content.drawForMatch(
+        room.state.playlist.modes,
+        players,
+        room.state.seed,
+        room.usedQuestions,
+      );
+      event = {
+        type: 'start',
+        at,
+        actorId: conn.memberId,
+        content: drawn.content,
+        tiebreakContent: drawn.tiebreak,
+      };
     } else {
-      event = { type: 'cmd', at, actorId: conn.memberId, command: cmd as Extract<RoomEvent, { type: 'cmd' }>['command'] };
+      event = {
+        type: 'cmd',
+        at,
+        actorId: conn.memberId,
+        command: cmd as Extract<RoomEvent, { type: 'cmd' }>['command'],
+      };
     }
     this.applyEvent(room, event, conn.memberId, env.id);
     const ack: AckMessage = { t: 'ack', id: env.id, ok: true };
@@ -174,7 +239,9 @@ export class RoomManager {
     const token = newSecretToken();
     const h = this.hash(token);
     room.tokens.set(memberId, h);
-    void room.queue.then(() => this.o.db.saveSession(room.state.id, memberId, h)).catch((err) => this.o.log.error({ err }, 'session persist failed'));
+    void room.queue
+      .then(() => this.o.db.saveSession(room.state.id, memberId, h))
+      .catch((err) => this.o.log.error({ err }, 'session persist failed'));
     return token;
   }
 
@@ -182,8 +249,9 @@ export class RoomManager {
     conn.roomId = room.state.id;
     conn.memberId = memberId;
     room.conns.add(conn);
-    conn.send({ t: 'ack', id, ok: true });
+    // welcome precedes the ack so clients know their identity when the command resolves
     conn.send({ t: 'welcome', memberId, roomCode: room.state.code, resumeToken: token });
+    conn.send({ t: 'ack', id, ok: true });
     this.sendState(room, conn);
   }
 
@@ -194,7 +262,16 @@ export class RoomManager {
       code = generateInviteCode();
     }
     const memberId = newId('m');
-    const e: Extract<RoomEvent, { type: 'create' }> = { type: 'create', at: this.now(), roomId: newId('room'), code, seed: randomInt(2 ** 31), timing: this.o.timing, memberId, name };
+    const e: Extract<RoomEvent, { type: 'create' }> = {
+      type: 'create',
+      at: this.now(),
+      roomId: newId('room'),
+      code,
+      seed: randomInt(2 ** 31),
+      timing: this.o.timing,
+      memberId,
+      name,
+    };
     const state = createRoom(e);
     const room = this.addRoom(state, 0);
     room.queue = room.queue.then(() => this.o.db.createRoom(state));
@@ -210,9 +287,15 @@ export class RoomManager {
     const room = roomId ? this.rooms.get(roomId) : undefined;
     if (!room) throw new GameError('NOT_FOUND', 'No room with that code');
     if (role === 'SPECTATOR') {
-      const spectators = [...room.conns].filter((c) => activeMembers(room.state).find((m) => m.id === c.memberId)?.role === 'SPECTATOR').length;
+      const spectators = [...room.conns].filter(
+        (c) => activeMembers(room.state).find((m) => m.id === c.memberId)?.role === 'SPECTATOR',
+      ).length;
       // Infrastructure safeguard only — the product has no fixed spectator limit.
-      if (spectators >= this.o.spectatorSoftCap) throw new GameError('ROOM_FULL', 'Spectator capacity temporarily reached (server safeguard). Try again shortly.');
+      if (spectators >= this.o.spectatorSoftCap)
+        throw new GameError(
+          'ROOM_FULL',
+          'Spectator capacity temporarily reached (server safeguard). Try again shortly.',
+        );
     }
     const memberId = newId('m');
     this.applyEvent(room, { type: 'join', at: this.now(), memberId, name, role }, memberId, id);
@@ -224,7 +307,9 @@ export class RoomManager {
     const room = roomId ? this.rooms.get(roomId) : undefined;
     if (!room) throw new GameError('NOT_FOUND', 'No room with that code');
     const h = Buffer.from(this.hash(token));
-    const memberId = [...room.tokens.entries()].find(([, v]) => v.length === h.length && timingSafeEqual(Buffer.from(v), h))?.[0];
+    const memberId = [...room.tokens.entries()].find(
+      ([, v]) => v.length === h.length && timingSafeEqual(Buffer.from(v), h),
+    )?.[0];
     if (!memberId) {
       this.o.metrics.inc('ft_resume_rejected_total');
       throw new GameError('UNAUTHORIZED', 'Resume token is invalid or was already used');
@@ -253,7 +338,12 @@ export class RoomManager {
     const stillConnected = [...room.conns].some((c) => c.memberId === conn.memberId);
     if (!stillConnected) {
       try {
-        this.applyEvent(room, { type: 'disconnect', at: this.now(), memberId: conn.memberId }, conn.memberId, null);
+        this.applyEvent(
+          room,
+          { type: 'disconnect', at: this.now(), memberId: conn.memberId },
+          conn.memberId,
+          null,
+        );
       } catch (e) {
         if (!(e instanceof GameError)) throw e;
       }
@@ -276,7 +366,8 @@ export class RoomManager {
     const results = s.matchNight?.results.slice(room.persisted.results) ?? [];
     const base = room.persisted.results;
     room.persisted.results += results.length;
-    const final = s.matchNight?.final && s.status === 'COMPLETED' && !room.persisted.record ? s.matchNight.final : null;
+    const final =
+      s.matchNight?.final && s.status === 'COMPLETED' && !room.persisted.record ? s.matchNight.final : null;
     if (final) room.persisted.record = true;
     const db = this.o.db;
     room.queue = room.queue
@@ -335,7 +426,11 @@ export class RoomManager {
       const key = m.role === 'SPECTATOR' ? 'SPECTATOR' : m.id;
       let msg = cache.get(key);
       if (!msg) {
-        msg = JSON.stringify({ t: 'state', serverNow: now, view: project(room.state, { memberId: m.role === 'SPECTATOR' ? null : m.id, role: m.role }, now) });
+        msg = JSON.stringify({
+          t: 'state',
+          serverNow: now,
+          view: project(room.state, { memberId: m.role === 'SPECTATOR' ? null : m.id, role: m.role }, now),
+        });
         cache.set(key, msg);
       }
       c.sendRaw(msg);
@@ -345,7 +440,11 @@ export class RoomManager {
   private sendState(room: Room, c: Conn) {
     const m = room.state.members.find((x) => x.id === c.memberId)!;
     const now = this.now();
-    c.send({ t: 'state', serverNow: now, view: project(room.state, { memberId: m.role === 'SPECTATOR' ? null : m.id, role: m.role }, now) });
+    c.send({
+      t: 'state',
+      serverNow: now,
+      view: project(room.state, { memberId: m.role === 'SPECTATOR' ? null : m.id, role: m.role }, now),
+    });
   }
 
   async flush() {

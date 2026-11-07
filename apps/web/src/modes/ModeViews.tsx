@@ -19,7 +19,19 @@ function useNames() {
   return memberNames(view);
 }
 
-function Head({ label, index, count, end, start }: { label: string; index?: number; count?: number; end: number | null; start?: number | null }) {
+function Head({
+  label,
+  index,
+  count,
+  end,
+  start,
+}: {
+  label: string;
+  index?: number;
+  count?: number;
+  end: number | null;
+  start?: number | null;
+}) {
   const { t } = useI18n();
   return (
     <div className="stack" style={{ gap: 8 }}>
@@ -40,10 +52,24 @@ function Head({ label, index, count, end, start }: { label: string; index?: numb
 function Locked({ show, children }: { show: boolean; children?: ReactNode }) {
   const { t } = useI18n();
   if (!show) return null;
-  return <Banner tone="info" icon="🔒">{children ?? t('submitted')}</Banner>;
+  return (
+    <Banner tone="info" icon="🔒">
+      {children ?? t('submitted')}
+    </Banner>
+  );
 }
 
-function TextAnswer({ disabled, onSubmit, placeholder, cta }: { disabled: boolean; onSubmit: (s: string) => Promise<unknown>; placeholder?: string; cta?: string }) {
+function TextAnswer({
+  disabled,
+  onSubmit,
+  placeholder,
+  cta,
+}: {
+  disabled: boolean;
+  onSubmit: (s: string) => Promise<unknown>;
+  placeholder?: string;
+  cta?: string;
+}) {
   const { t } = useI18n();
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
@@ -59,7 +85,16 @@ function TextAnswer({ disabled, onSubmit, placeholder, cta }: { disabled: boolea
       <label className="sr-only" htmlFor="answer">
         {placeholder ?? t('typeAnswer')}
       </label>
-      <input id="answer" className="input" autoComplete="off" maxLength={80} value={text} disabled={disabled || busy} placeholder={placeholder ?? t('typeAnswer')} onChange={(e) => setText(e.target.value)} />
+      <input
+        id="answer"
+        className="input"
+        autoComplete="off"
+        maxLength={80}
+        value={text}
+        disabled={disabled || busy}
+        placeholder={placeholder ?? t('typeAnswer')}
+        onChange={(e) => setText(e.target.value)}
+      />
       <button className="btn primary" disabled={disabled || busy || !text.trim()}>
         {cta ?? t('submit')}
       </button>
@@ -68,7 +103,19 @@ function TextAnswer({ disabled, onSubmit, placeholder, cta }: { disabled: boolea
 }
 
 /** Four-option grid; reveal states use colour AND text labels (never colour alone). */
-function Options({ options, picked, correctId, disabled, onPick }: { options: { id: string; label: string }[]; picked?: string | null; correctId?: string | null; disabled: boolean; onPick: (id: string) => void }) {
+function Options({
+  options,
+  picked,
+  correctId,
+  disabled,
+  onPick,
+}: {
+  options: { id: string; label: string }[];
+  picked?: string | null;
+  correctId?: string | null;
+  disabled: boolean;
+  onPick: (id: string) => void;
+}) {
   const { t } = useI18n();
   return (
     <div className="options" role="group">
@@ -77,13 +124,23 @@ function Options({ options, picked, correctId, disabled, onPick }: { options: { 
         const isWrongPick = correctId && picked === o.id && o.id !== correctId;
         const cls = isCorrect ? 'correct' : isWrongPick ? 'incorrect' : picked === o.id ? 'picked' : '';
         return (
-          <button key={o.id} className={`option ${cls}`} disabled={disabled} aria-pressed={picked === o.id} onClick={() => onPick(o.id)}>
+          <button
+            key={o.id}
+            className={`option ${cls}`}
+            disabled={disabled}
+            aria-pressed={picked === o.id}
+            onClick={() => onPick(o.id)}
+          >
             <span className="key" aria-hidden="true">
               {KEYS[i]}
             </span>
             <span>{o.label}</span>
             {isCorrect && <span className="verdict accent">✓ {t('correct')}</span>}
-            {isWrongPick && <span className="verdict" style={{ color: 'var(--danger)' }}>✕ {t('wrong')}</span>}
+            {isWrongPick && (
+              <span className="verdict" style={{ color: 'var(--danger)' }}>
+                ✕ {t('wrong')}
+              </span>
+            )}
           </button>
         );
       })}
@@ -98,7 +155,15 @@ function RevealNote({ v, me }: { v: any; me: string | null }) {
   const mine = me ? v.submissions?.[me] : null;
   if (!mine) return null;
   if (!mine.answered) return <Banner tone="bad">{t('timeUp')}</Banner>;
-  return mine.correct ? <Banner tone="ok" icon="✓">{t('correct')}</Banner> : <Banner tone="bad" icon="✕">{t('wrong')}</Banner>;
+  return mine.correct ? (
+    <Banner tone="ok" icon="✓">
+      {t('correct')}
+    </Banner>
+  ) : (
+    <Banner tone="bad" icon="✕">
+      {t('wrong')}
+    </Banner>
+  );
 }
 
 function AnsweredRow({ v, players }: { v: any; players: string[] }) {
@@ -123,8 +188,16 @@ export function HigherLower({ v, me, role, players }: ModeProps) {
   const send = (choice: string) => client.act({ type: 'answer', choice, itemIndex: v.itemIndex });
   return (
     <div className="stage">
-      <Head label={it.statLabel} index={v.itemIndex} count={v.itemCount} end={v.phase === 'QUESTION' || v.phase === 'REVEAL' ? v.phaseEnd : null} start={v.phaseStart} />
-      <p className="muted small" style={{ margin: 0 }}>{it.scope}</p>
+      <Head
+        label={it.statLabel}
+        index={v.itemIndex}
+        count={v.itemCount}
+        end={v.phase === 'QUESTION' || v.phase === 'REVEAL' ? v.phaseEnd : null}
+        start={v.phaseStart}
+      />
+      <p className="muted small" style={{ margin: 0 }}>
+        {it.scope}
+      </p>
       <div className="versus">
         <div className="statcard">
           <span className="eyebrow">A</span>
@@ -142,15 +215,25 @@ export function HigherLower({ v, me, role, players }: ModeProps) {
       </div>
       {v.phase === 'QUESTION' && role === 'PLAYER' && (
         <div className="options">
-          <button className={`option ${mine === 'HIGHER' ? 'picked' : ''}`} disabled={!canAnswer} onClick={() => send('HIGHER')}>
+          <button
+            className={`option ${mine === 'HIGHER' ? 'picked' : ''}`}
+            disabled={!canAnswer}
+            onClick={() => send('HIGHER')}
+          >
             <span className="key">▲</span> B is higher
           </button>
-          <button className={`option ${mine === 'LOWER' ? 'picked' : ''}`} disabled={!canAnswer} onClick={() => send('LOWER')}>
+          <button
+            className={`option ${mine === 'LOWER' ? 'picked' : ''}`}
+            disabled={!canAnswer}
+            onClick={() => send('LOWER')}
+          >
             <span className="key">▼</span> B is lower
           </button>
         </div>
       )}
-      <Locked show={!!mine && v.phase === 'QUESTION'}>Locked in: B is {mine === 'HIGHER' ? 'higher' : 'lower'}</Locked>
+      <Locked show={!!mine && v.phase === 'QUESTION'}>
+        Locked in: B is {mine === 'HIGHER' ? 'higher' : 'lower'}
+      </Locked>
       {it.correct && <Banner tone="info">B is {it.correct === 'HIGHER' ? 'higher' : 'lower'}.</Banner>}
       <RevealNote v={v} me={me} />
       <AnsweredRow v={v} players={players} />
@@ -161,7 +244,14 @@ export function HigherLower({ v, me, role, players }: ModeProps) {
 }
 
 // ---------------------------------------------------------------- MCQ-based: Last Man Standing & tiebreak
-export function Mcq({ v, me, role, players, label, extra }: ModeProps & { label: string; extra?: ReactNode }) {
+export function Mcq({
+  v,
+  me,
+  role,
+  players,
+  label,
+  extra,
+}: ModeProps & { label: string; extra?: ReactNode }) {
   const it = v.item;
   const mine = me ? v.submissions?.[me]?.answer : null;
   const eligible = me ? v.eligible.includes(me) : false;
@@ -171,10 +261,22 @@ export function Mcq({ v, me, role, players, label, extra }: ModeProps & { label:
       <Head label={label} index={v.itemIndex} count={v.itemCount} end={v.phaseEnd} start={v.phaseStart} />
       {extra}
       <h2 className="prompt">{it.prompt}</h2>
-      <Options options={it.options} picked={mine} correctId={it.correctOptionId} disabled={!canAnswer} onPick={(id) => client.act({ type: 'answer', optionId: id, itemIndex: v.itemIndex })} />
-      {role === 'PLAYER' && !eligible && v.phase === 'QUESTION' && <Banner tone="warn">You are watching this question.</Banner>}
+      <Options
+        options={it.options}
+        picked={mine}
+        correctId={it.correctOptionId}
+        disabled={!canAnswer}
+        onPick={(id) => client.act({ type: 'answer', optionId: id, itemIndex: v.itemIndex })}
+      />
+      {role === 'PLAYER' && !eligible && v.phase === 'QUESTION' && (
+        <Banner tone="warn">You are watching this question.</Banner>
+      )}
       <RevealNote v={v} me={me} />
-      {it.explanation && <p className="muted" style={{ margin: 0 }}>{it.explanation}</p>}
+      {it.explanation && (
+        <p className="muted" style={{ margin: 0 }}>
+          {it.explanation}
+        </p>
+      )}
       <AnsweredRow v={v} players={players} />
       <Attribution text={it.attribution} />
     </div>
@@ -217,7 +319,13 @@ export function MissingXi({ v, me, role, players }: ModeProps) {
   const value = [5, 3, 1][it.hintsViewed] ?? 1;
   return (
     <div className="stage">
-      <Head label="Missing XI" index={v.itemIndex} count={v.itemCount} end={v.phaseEnd} start={v.phaseStart} />
+      <Head
+        label="Missing XI"
+        index={v.itemIndex}
+        count={v.itemCount}
+        end={v.phaseEnd}
+        start={v.phaseStart}
+      />
       <div>
         <h2 className="prompt">{it.match}</h2>
         <p className="muted" style={{ margin: '4px 0 0' }}>
@@ -229,7 +337,9 @@ export function MissingXi({ v, me, role, players }: ModeProps) {
           <div key={i} className="formation-row">
             {row.map((s: any) => (
               <div key={s.slot} className={`shirt ${s.player ? '' : 'missing'}`}>
-                <div className="eyebrow" style={{ fontSize: 11 }}>{s.position}</div>
+                <div className="eyebrow" style={{ fontSize: 11 }}>
+                  {s.position}
+                </div>
                 <div>{s.player ?? (it.answer ? it.answer : '?')}</div>
               </div>
             ))}
@@ -242,12 +352,28 @@ export function MissingXi({ v, me, role, players }: ModeProps) {
         </Banner>
       ))}
       {role === 'PLAYER' && v.phase === 'QUESTION' && !mine && it.hintsViewed < 2 && (
-        <button className="btn" disabled={!hintReady} onClick={() => client.act({ type: 'hint', itemIndex: v.itemIndex })}>
-          {hintReady ? `Reveal hint ${it.hintsViewed + 1} (max drops to ${[3, 1][it.hintsViewed]})` : `Hint ${it.hintsViewed + 1} unlocks in ${Math.ceil((nextHintAt! - now) / 1000)}s`}
+        <button
+          className="btn"
+          disabled={!hintReady}
+          onClick={() => client.act({ type: 'hint', itemIndex: v.itemIndex })}
+        >
+          {hintReady
+            ? `Reveal hint ${it.hintsViewed + 1} (max drops to ${[3, 1][it.hintsViewed]})`
+            : `Hint ${it.hintsViewed + 1} unlocks in ${Math.ceil((nextHintAt! - now) / 1000)}s`}
         </button>
       )}
-      {role === 'PLAYER' && v.phase === 'QUESTION' && <p className="small muted" style={{ margin: 0 }}>One answer only — it cannot be changed. Worth +{value} now.</p>}
-      {canAnswer && <TextAnswer disabled={!canAnswer} onSubmit={(text) => client.act({ type: 'answer', text, itemIndex: v.itemIndex })} placeholder="Missing player's name" />}
+      {role === 'PLAYER' && v.phase === 'QUESTION' && (
+        <p className="small muted" style={{ margin: 0 }}>
+          One answer only — it cannot be changed. Worth +{value} now.
+        </p>
+      )}
+      {canAnswer && (
+        <TextAnswer
+          disabled={!canAnswer}
+          onSubmit={(text) => client.act({ type: 'answer', text, itemIndex: v.itemIndex })}
+          placeholder="Missing player's name"
+        />
+      )}
       <Locked show={!!mine && v.phase === 'QUESTION'}>Locked in: {mine?.text}</Locked>
       <RevealNote v={v} me={me} />
       <AnsweredRow v={v} players={players} />
@@ -265,17 +391,41 @@ export function GuessTheMatch({ v, me, role, players }: ModeProps) {
   const worth = [5, 3, 1][Math.max(0, it.clues.length - 1)] ?? 1;
   return (
     <div className="stage">
-      <Head label="Guess the Match" index={v.itemIndex} count={v.itemCount} end={v.phaseEnd} start={v.phaseStart} />
+      <Head
+        label="Guess the Match"
+        index={v.itemIndex}
+        count={v.itemCount}
+        end={v.phaseEnd}
+        start={v.phaseStart}
+      />
       <ol className="list" aria-label="Clues">
         {[0, 1, 2].map((i) => (
           <li key={i} className="list-item">
-            <span className="num accent" style={{ fontSize: 22 }}>{i + 1}</span>
-            <span className="grow">{it.clues[i] ?? <span className="muted">Clue {i + 1} unlocks at {it.clueTimes[i] / 1000}s</span>}</span>
+            <span className="num accent" style={{ fontSize: 22 }}>
+              {i + 1}
+            </span>
+            <span className="grow">
+              {it.clues[i] ?? (
+                <span className="muted">
+                  Clue {i + 1} unlocks at {it.clueTimes[i] / 1000}s
+                </span>
+              )}
+            </span>
           </li>
         ))}
       </ol>
-      {v.phase === 'QUESTION' && role === 'PLAYER' && !mine && <p className="small muted" style={{ margin: 0 }}>One confirmed answer. Worth +{worth} right now (no speed bonus).</p>}
-      <Options options={it.options} picked={mine?.optionId} correctId={it.correctOptionId} disabled={!canAnswer} onPick={(id) => client.act({ type: 'answer', optionId: id, itemIndex: v.itemIndex })} />
+      {v.phase === 'QUESTION' && role === 'PLAYER' && !mine && (
+        <p className="small muted" style={{ margin: 0 }}>
+          One confirmed answer. Worth +{worth} right now (no speed bonus).
+        </p>
+      )}
+      <Options
+        options={it.options}
+        picked={mine?.optionId}
+        correctId={it.correctOptionId}
+        disabled={!canAnswer}
+        onPick={(id) => client.act({ type: 'answer', optionId: id, itemIndex: v.itemIndex })}
+      />
       <Locked show={!!mine && v.phase === 'QUESTION'}>Confirmed with {mine?.tier} clue(s)</Locked>
       <RevealNote v={v} me={me} />
       <AnsweredRow v={v} players={players} />
@@ -293,7 +443,13 @@ export function Connections({ v, me, role, players }: ModeProps) {
   const canAnswer = role === 'PLAYER' && v.phase === 'QUESTION' && !mine;
   return (
     <div className="stage">
-      <Head label="Connections" index={v.itemIndex} count={v.itemCount} end={v.phaseEnd} start={v.phaseStart} />
+      <Head
+        label="Connections"
+        index={v.itemIndex}
+        count={v.itemCount}
+        end={v.phaseEnd}
+        start={v.phaseStart}
+      />
       <h2 className="prompt">What links these four?</h2>
       <div className="options">
         {it.entities.map((e: string) => (
@@ -302,8 +458,16 @@ export function Connections({ v, me, role, players }: ModeProps) {
           </div>
         ))}
       </div>
-      {canAnswer && <TextAnswer disabled={!canAnswer} onSubmit={(text) => client.act({ type: 'answer', text, itemIndex: v.itemIndex })} placeholder="The connection" />}
-      <p className="small muted" style={{ margin: 0 }}>Earliest correct +3, other correct +2. One answer each.</p>
+      {canAnswer && (
+        <TextAnswer
+          disabled={!canAnswer}
+          onSubmit={(text) => client.act({ type: 'answer', text, itemIndex: v.itemIndex })}
+          placeholder="The connection"
+        />
+      )}
+      <p className="small muted" style={{ margin: 0 }}>
+        Earliest correct +3, other correct +2. One answer each.
+      </p>
       <Locked show={!!mine && v.phase === 'QUESTION'}>Locked in: {mine}</Locked>
       {v.phase === 'REVIEW' && <Banner tone="warn">The judge is reviewing alternative links…</Banner>}
       {role === 'JUDGE' && v.reviews?.length > 0 && (
@@ -314,17 +478,27 @@ export function Connections({ v, me, role, players }: ModeProps) {
               <span className="grow">
                 <strong>{names[r.memberId]}</strong>: “{r.answer}”
               </span>
-              <button className="btn sm" onClick={() => client.act({ type: 'review', memberId: r.memberId, accept: true })}>
+              <button
+                className="btn sm"
+                onClick={() => client.act({ type: 'review', memberId: r.memberId, accept: true })}
+              >
                 Valid
               </button>
-              <button className="btn sm danger" onClick={() => client.act({ type: 'review', memberId: r.memberId, accept: false })}>
+              <button
+                className="btn sm danger"
+                onClick={() => client.act({ type: 'review', memberId: r.memberId, accept: false })}
+              >
                 Not valid
               </button>
             </div>
           ))}
         </div>
       )}
-      {it.link && <Banner tone="info">Link: {it.link}. {it.explanation}</Banner>}
+      {it.link && (
+        <Banner tone="info">
+          Link: {it.link}. {it.explanation}
+        </Banner>
+      )}
       <RevealNote v={v} me={me} />
       <AnsweredRow v={v} players={players} />
       <Attribution text={it.attribution} />
@@ -340,14 +514,25 @@ export function RiskIt({ v, players }: ModeProps) {
   const RISK = { SAFE: '+1 / 0', BOLD: '+3 / −1', ALL_IN: '+6 / −3' } as const;
   return (
     <div className="stage">
-      <Head label={`Risk It · ${names[v.player]}'s turn`} index={v.turnIndex} count={v.turnCount} end={v.phaseEnd} start={v.phaseStart} />
+      <Head
+        label={`Risk It · ${names[v.player]}'s turn`}
+        index={v.turnIndex}
+        count={v.turnCount}
+        end={v.phaseEnd}
+        start={v.phaseStart}
+      />
       <div className="row">
         <Avatar id={v.player} name={names[v.player] ?? '?'} />
         <strong>{v.isMyTurn ? 'Your turn' : names[v.player]}</strong>
-        {v.risk && <span className="badge info">{v.risk.replace('_', ' ')} {RISK[v.risk as keyof typeof RISK]}{v.riskDefaulted ? ' (auto)' : ''}</span>}
+        {v.risk && (
+          <span className="badge info">
+            {v.risk.replace('_', ' ')} {RISK[v.risk as keyof typeof RISK]}
+            {v.riskDefaulted ? ' (auto)' : ''}
+          </span>
+        )}
       </div>
-      {v.phase === 'CHOOSE' && (
-        v.isMyTurn ? (
+      {v.phase === 'CHOOSE' &&
+        (v.isMyTurn ? (
           <div className="options" role="group" aria-label="Choose risk">
             {(Object.keys(RISK) as Array<keyof typeof RISK>).map((r) => (
               <button key={r} className="option" onClick={() => client.act({ type: 'risk', risk: r })}>
@@ -362,15 +547,26 @@ export function RiskIt({ v, players }: ModeProps) {
           </div>
         ) : (
           <Banner>{names[v.player]} is choosing a risk level…</Banner>
-        )
-      )}
+        ))}
       {it && (
         <>
           <h2 className="prompt">{it.prompt}</h2>
-          <Options options={it.options} picked={v.answer} correctId={it.correctOptionId} disabled={!v.isMyTurn || v.phase !== 'ANSWER'} onPick={(id) => client.act({ type: 'answer', optionId: id })} />
+          <Options
+            options={it.options}
+            picked={v.answer}
+            correctId={it.correctOptionId}
+            disabled={!v.isMyTurn || v.phase !== 'ANSWER'}
+            onPick={(id) => client.act({ type: 'answer', optionId: id })}
+          />
         </>
       )}
-      {v.phase === 'REVEAL' && <Banner tone={v.correct ? 'ok' : v.correct === null ? 'warn' : 'bad'}>{v.correct === null ? 'Voided' : `${v.correct ? 'Correct' : v.answer ? 'Wrong' : "Time's up"} · ${v.delta > 0 ? '+' : ''}${v.delta}`}</Banner>}
+      {v.phase === 'REVEAL' && (
+        <Banner tone={v.correct ? 'ok' : v.correct === null ? 'warn' : 'bad'}>
+          {v.correct === null
+            ? 'Voided'
+            : `${v.correct ? 'Correct' : v.answer ? 'Wrong' : "Time's up"} · ${v.delta > 0 ? '+' : ''}${v.delta}`}
+        </Banner>
+      )}
       <Attribution text={it?.attribution} />
       <ScoreStrip scores={v.scores} players={players} highlight={v.player} />
     </div>
@@ -384,13 +580,27 @@ export function Timeline({ v, me, players }: ModeProps) {
   const myPick = me ? v.picks[me] : null;
   return (
     <div className="stage">
-      <Head label="History Duel" index={v.duelIndex} count={v.duelCount} end={v.phaseEnd} start={v.phaseStart} />
+      <Head
+        label="History Duel"
+        index={v.duelIndex}
+        count={v.duelCount}
+        end={v.phaseEnd}
+        start={v.phaseStart}
+      />
       <div className="row" style={{ justifyContent: 'center', gap: 16 }}>
-        <span className="row"><Avatar id={v.initiator} name={names[v.initiator] ?? '?'} /> <strong>{names[v.initiator]}</strong></span>
+        <span className="row">
+          <Avatar id={v.initiator} name={names[v.initiator] ?? '?'} /> <strong>{names[v.initiator]}</strong>
+        </span>
         <span className="display h3 muted">vs</span>
-        <span className="row"><Avatar id={v.opponent} name={names[v.opponent] ?? '?'} /> <strong>{names[v.opponent]}</strong></span>
+        <span className="row">
+          <Avatar id={v.opponent} name={names[v.opponent] ?? '?'} /> <strong>{names[v.opponent]}</strong>
+        </span>
       </div>
-      {v.phase === 'INTRO' && <Banner>{names[v.initiator]} challenges {names[v.opponent]}. Get ready…</Banner>}
+      {v.phase === 'INTRO' && (
+        <Banner>
+          {names[v.initiator]} challenges {names[v.opponent]}. Get ready…
+        </Banner>
+      )}
       {it && (
         <>
           <h2 className="prompt">{it.prompt}</h2>
@@ -398,7 +608,12 @@ export function Timeline({ v, me, players }: ModeProps) {
             {it.events.map((e: any) => {
               const earlier = it.earlierId === e.id;
               return (
-                <button key={e.id} className={`option ${it.earlierId ? (earlier ? 'correct' : '') : myPick === e.id ? 'picked' : ''}`} disabled={!v.inDuel || v.phase !== 'ANSWER' || !!myPick} onClick={() => client.act({ type: 'pick', eventId: e.id })}>
+                <button
+                  key={e.id}
+                  className={`option ${it.earlierId ? (earlier ? 'correct' : '') : myPick === e.id ? 'picked' : ''}`}
+                  disabled={!v.inDuel || v.phase !== 'ANSWER' || !!myPick}
+                  onClick={() => client.act({ type: 'pick', eventId: e.id })}
+                >
                   <span>
                     {e.label}
                     {e.date && <span className="small muted"> · {e.date}</span>}
@@ -433,29 +648,65 @@ export function Top25({ v, players }: ModeProps) {
   const last = v.lastGuess;
   return (
     <div className="stage">
-      <Head label={`TOP 25 · round ${v.round + 1}`} end={v.phase === 'TURN' ? v.phaseEnd : null} start={v.phaseStart} />
+      <Head
+        label={`TOP 25 · round ${v.round + 1}`}
+        end={v.phase === 'TURN' ? v.phaseEnd : null}
+        start={v.phaseStart}
+      />
       <div>
         <h2 className="prompt">{v.title}</h2>
-        <p className="muted small" style={{ margin: '4px 0 0' }}>{v.scope}. Rank #N = N points · first to {v.target} ends after the current round.</p>
+        <p className="muted small" style={{ margin: '4px 0 0' }}>
+          {v.scope}. Rank #N = N points · first to {v.target} ends after the current round.
+        </p>
       </div>
       <div className="row small">
         <span className="eyebrow">Snake order</span>
         {v.order.map((m: string) => (
-          <span key={m} className={`badge ${m === v.player ? 'info' : ''}`}>{names[m]}</span>
+          <span key={m} className={`badge ${m === v.player ? 'info' : ''}`}>
+            {names[m]}
+          </span>
         ))}
       </div>
-      {v.phase === 'TURN' && (v.isMyTurn ? <TextAnswer disabled={false} onSubmit={(text) => client.act({ type: 'guess', text })} placeholder="Name someone on the list" cta="Guess" /> : <Banner>{names[v.player]} is guessing…</Banner>)}
+      {v.phase === 'TURN' &&
+        (v.isMyTurn ? (
+          <TextAnswer
+            disabled={false}
+            onSubmit={(text) => client.act({ type: 'guess', text })}
+            placeholder="Name someone on the list"
+            cta="Guess"
+          />
+        ) : (
+          <Banner>{names[v.player]} is guessing…</Banner>
+        ))}
       {last && (
         <Banner tone={last.rank && !last.duplicate ? 'ok' : 'bad'}>
-          {names[last.player]}: “{last.text ?? '—'}” → {last.text === null ? "time's up" : last.duplicate ? 'already found (0)' : last.rank ? `#${last.rank} (+${last.rank})` : 'not on the list (0)'}
+          {names[last.player]}: “{last.text ?? '—'}” →{' '}
+          {last.text === null
+            ? "time's up"
+            : last.duplicate
+              ? 'already found (0)'
+              : last.rank
+                ? `#${last.rank} (+${last.rank})`
+                : 'not on the list (0)'}
         </Banner>
       )}
-      {v.endReason && <Banner tone="info">Finished: {v.endReason === 'TARGET' ? `${v.target} reached and the round completed` : v.endReason === 'EXHAUSTED' ? 'all 25 found' : 'round limit reached'}</Banner>}
+      {v.endReason && (
+        <Banner tone="info">
+          Finished:{' '}
+          {v.endReason === 'TARGET'
+            ? `${v.target} reached and the round completed`
+            : v.endReason === 'EXHAUSTED'
+              ? 'all 25 found'
+              : 'round limit reached'}
+        </Banner>
+      )}
       <div className="grid25" aria-label="Ranked list">
         {v.grid.map((c: any) => (
           <div key={c.rank} className={`cell25 ${c.foundBy ? 'found' : ''}`}>
             <span className="num">{c.rank}</span>
-            <span className="truncate" style={{ flex: 1 }}>{c.label ?? <span className="muted">— hidden —</span>}</span>
+            <span className="truncate" style={{ flex: 1 }}>
+              {c.label ?? <span className="muted">— hidden —</span>}
+            </span>
             {c.foundBy && <Avatar id={c.foundBy} name={names[c.foundBy] ?? '?'} size={22} />}
           </div>
         ))}
@@ -473,7 +724,13 @@ export function Buzzer({ v, me, role, players }: ModeProps) {
   const now = useGameNow();
   return (
     <div className="stage">
-      <Head label="Buzzer Battle" index={v.itemIndex} count={v.itemCount} end={v.phase === 'ANSWERING' ? v.answerWindowEnd : v.phaseEnd} start={v.phaseStart} />
+      <Head
+        label="Buzzer Battle"
+        index={v.itemIndex}
+        count={v.itemCount}
+        end={v.phase === 'ANSWERING' ? v.answerWindowEnd : v.phaseEnd}
+        start={v.phaseStart}
+      />
       <h2 className="prompt">{v.prompt}</h2>
       {isJudge && (
         <Banner tone="warn" icon="⚖">
@@ -488,17 +745,36 @@ export function Buzzer({ v, me, role, players }: ModeProps) {
       )}
       {isJudge && v.phase === 'ANSWERING' && (
         <div className="row">
-          <button className="btn primary" onClick={() => client.act({ type: 'verdict', verdict: 'CORRECT' })}>Correct +3</button>
-          <button className="btn danger" onClick={() => client.act({ type: 'verdict', verdict: 'WRONG' })}>Wrong −1</button>
-          <button className="btn" disabled={now < v.answerWindowEnd} onClick={() => client.act({ type: 'verdict', verdict: 'TIMEOUT' })}>No answer in 8s</button>
+          <button className="btn primary" onClick={() => client.act({ type: 'verdict', verdict: 'CORRECT' })}>
+            Correct +3
+          </button>
+          <button className="btn danger" onClick={() => client.act({ type: 'verdict', verdict: 'WRONG' })}>
+            Wrong −1
+          </button>
+          <button
+            className="btn"
+            disabled={now < v.answerWindowEnd}
+            onClick={() => client.act({ type: 'verdict', verdict: 'TIMEOUT' })}
+          >
+            No answer in 8s
+          </button>
         </div>
       )}
       {role === 'PLAYER' && v.phase !== 'REVEAL' && v.phase !== 'DONE' && (
-        <button className="buzzer" disabled={!v.canBuzz} onClick={() => client.act({ type: 'buzz' })} aria-label="Buzz">
+        <button
+          className="buzzer"
+          disabled={!v.canBuzz}
+          onClick={() => client.act({ type: 'buzz' })}
+          aria-label="Buzz"
+        >
           {v.canBuzz ? 'Buzz' : v.lockedOut.includes(me) ? 'Used' : 'Wait'}
         </button>
       )}
-      {v.phase === 'REVEAL' && <Banner tone="info">Answer: {v.answer}. {v.explanation}</Banner>}
+      {v.phase === 'REVEAL' && (
+        <Banner tone="info">
+          Answer: {v.answer}. {v.explanation}
+        </Banner>
+      )}
       <div className="row small">
         {v.buzzes.map((b: any, i: number) => (
           <span key={i} className={`badge ${b.verdict === 'CORRECT' ? 'ok' : b.verdict ? 'bad' : 'info'}`}>
@@ -515,13 +791,29 @@ export function Buzzer({ v, me, role, players }: ModeProps) {
 // ---------------------------------------------------------------- The Impostor
 export function Impostor({ v, me, role, players }: ModeProps) {
   const names = useNames();
-  const phaseLabel: Record<string, string> = { REVEAL: 'Secret reveal', CLUES: `Clue cycle ${v.clueCycle ?? ''}`, DISCUSSION: 'Discussion', VOTE: 'Vote', GUESS: 'Impostor guess', ROUND_REVEAL: 'Round reveal', DONE: 'Finished' };
+  const phaseLabel: Record<string, string> = {
+    REVEAL: 'Secret reveal',
+    CLUES: `Clue cycle ${v.clueCycle ?? ''}`,
+    DISCUSSION: 'Discussion',
+    VOTE: 'Vote',
+    GUESS: 'Impostor guess',
+    ROUND_REVEAL: 'Round reveal',
+    DONE: 'Finished',
+  };
   return (
     <div className="stage">
-      <Head label={`The Impostor · ${phaseLabel[v.phase]}`} index={v.round} count={v.roundCount} end={v.phaseEnd} start={v.phaseStart} />
+      <Head
+        label={`The Impostor · ${phaseLabel[v.phase]}`}
+        index={v.round}
+        count={v.roundCount}
+        end={v.phaseEnd}
+        start={v.phaseStart}
+      />
       {v.role === 'IMPOSTOR' && v.phase !== 'ROUND_REVEAL' && v.phase !== 'DONE' && (
         <div className="card" style={{ borderColor: 'var(--danger)', textAlign: 'center' }}>
-          <div className="display h2" style={{ color: 'var(--danger)' }}>You are the impostor</div>
+          <div className="display h2" style={{ color: 'var(--danger)' }}>
+            You are the impostor
+          </div>
           <p className="muted">You don’t know the footballer. Blend in with your clues.</p>
         </div>
       )}
@@ -532,40 +824,71 @@ export function Impostor({ v, me, role, players }: ModeProps) {
           <p className="muted small">{v.context}</p>
         </div>
       )}
-      {role !== 'PLAYER' && v.phase !== 'ROUND_REVEAL' && <Banner>The secret footballer is hidden from {role === 'JUDGE' ? 'judges' : 'spectators'}.</Banner>}
+      {role !== 'PLAYER' && v.phase !== 'ROUND_REVEAL' && (
+        <Banner>The secret footballer is hidden from {role === 'JUDGE' ? 'judges' : 'spectators'}.</Banner>
+      )}
       {v.phase === 'CLUES' && (
         <div className="row">
           <Avatar id={v.clueGiver} name={names[v.clueGiver] ?? '?'} />
-          <strong>{v.clueGiver === me ? 'Your clue — say it out loud' : `${names[v.clueGiver]} is giving a clue`}</strong>
-          {v.clueGiver === me && <button className="btn sm" onClick={() => client.act({ type: 'clueDone' })}>Done</button>}
+          <strong>
+            {v.clueGiver === me ? 'Your clue — say it out loud' : `${names[v.clueGiver]} is giving a clue`}
+          </strong>
+          {v.clueGiver === me && (
+            <button className="btn sm" onClick={() => client.act({ type: 'clueDone' })}>
+              Done
+            </button>
+          )}
         </div>
       )}
       {v.phase === 'DISCUSSION' && <Banner>Discuss out loud: who is bluffing?</Banner>}
       {v.phase === 'VOTE' && role === 'PLAYER' && (
         <div className="stack">
-          <div className="eyebrow">{v.myVote ? `You voted for ${names[v.myVote]}` : 'Vote for the impostor'}</div>
-          <div className="options">
-            {players.filter((p) => p !== me).map((p) => (
-              <button key={p} className={`option ${v.myVote === p ? 'picked' : ''}`} disabled={!!v.myVote} onClick={() => client.act({ type: 'vote', target: p })}>
-                <Avatar id={p} name={names[p] ?? '?'} /> {names[p]}
-              </button>
-            ))}
+          <div className="eyebrow">
+            {v.myVote ? `You voted for ${names[v.myVote]}` : 'Vote for the impostor'}
           </div>
-          <p className="small muted" style={{ margin: 0 }}>{v.voted.length}/{players.length} voted. Votes stay private until the reveal.</p>
+          <div className="options">
+            {players
+              .filter((p) => p !== me)
+              .map((p) => (
+                <button
+                  key={p}
+                  className={`option ${v.myVote === p ? 'picked' : ''}`}
+                  disabled={!!v.myVote}
+                  onClick={() => client.act({ type: 'vote', target: p })}
+                >
+                  <Avatar id={p} name={names[p] ?? '?'} /> {names[p]}
+                </button>
+              ))}
+          </div>
+          <p className="small muted" style={{ margin: 0 }}>
+            {v.voted.length}/{players.length} voted. Votes stay private until the reveal.
+          </p>
         </div>
       )}
       {v.phase === 'GUESS' && (
         <>
           <Banner tone="warn">{names[v.impostor]} was caught! They get one guess at the footballer.</Banner>
-          {v.role === 'IMPOSTOR' && <TextAnswer disabled={false} onSubmit={(text) => client.act({ type: 'guess', text })} placeholder="Who is the footballer?" cta="Guess" />}
+          {v.role === 'IMPOSTOR' && (
+            <TextAnswer
+              disabled={false}
+              onSubmit={(text) => client.act({ type: 'guess', text })}
+              placeholder="Who is the footballer?"
+              cta="Guess"
+            />
+          )}
         </>
       )}
       {v.phase === 'ROUND_REVEAL' && (
         <div className="card stack">
           <div>
-            The footballer was <strong className="accent">{v.footballer}</strong>. The impostor was <strong>{names[v.impostor]}</strong> — {v.caught ? 'caught' : 'escaped'}.
+            The footballer was <strong className="accent">{v.footballer}</strong>. The impostor was{' '}
+            <strong>{names[v.impostor]}</strong> — {v.caught ? 'caught' : 'escaped'}.
           </div>
-          {v.caught && <div>Guess: “{v.guess ?? '—'}” {v.guessCorrect ? '✓ correct' : '✕ wrong'}</div>}
+          {v.caught && (
+            <div>
+              Guess: “{v.guess ?? '—'}” {v.guessCorrect ? '✓ correct' : '✕ wrong'}
+            </div>
+          )}
           <div className="row small">
             {Object.entries(v.votes ?? {}).map(([voter, target]) => (
               <span key={voter} className={`badge ${target === v.impostor ? 'ok' : ''}`}>
@@ -598,55 +921,116 @@ export function Auction({ v, me, role, players }: ModeProps) {
   const [name, setName] = useState('');
   return (
     <div className="stage">
-      <Head label={`Auction · ${v.phase === 'CHALLENGE' ? '30 seconds' : v.phase === 'BIDDING' ? 'Bidding' : v.phase === 'AWAIT_JUDGE' ? 'Ready' : 'Result'}`} index={v.round} count={v.roundCount} end={v.phaseEnd} start={v.phaseStart} />
+      <Head
+        label={`Auction · ${v.phase === 'CHALLENGE' ? '30 seconds' : v.phase === 'BIDDING' ? 'Bidding' : v.phase === 'AWAIT_JUDGE' ? 'Ready' : 'Result'}`}
+        index={v.round}
+        count={v.roundCount}
+        end={v.phaseEnd}
+        start={v.phaseStart}
+      />
       <div>
         <h2 className="prompt">{v.category}</h2>
-        <p className="muted small" style={{ margin: '4px 0 0' }}>{v.scope} · max bid {v.maxBid}</p>
+        <p className="muted small" style={{ margin: '4px 0 0' }}>
+          {v.scope} · max bid {v.maxBid}
+        </p>
       </div>
       <div className="row">
-        <span className="badge info">Current bid: {v.bid || '—'} {v.bidder ? `by ${names[v.bidder]}` : ''}</span>
+        <span className="badge info">
+          Current bid: {v.bid || '—'} {v.bidder ? `by ${names[v.bidder]}` : ''}
+        </span>
         {v.challenger && <span className="badge warn">Challenger: {names[v.challenger]}</span>}
       </div>
-      {v.phase === 'BIDDING' && (
-        myTurn ? (
+      {v.phase === 'BIDDING' &&
+        (myTurn ? (
           <div className="card stack">
             <div className="eyebrow">Your bid</div>
             <div className="row" style={{ flexWrap: 'nowrap' }}>
-              <button className="btn" aria-label="Decrease" onClick={() => setAmount(Math.max(min, amount - 1))}>−</button>
-              <span className="num" style={{ fontSize: 40, minWidth: 60, textAlign: 'center' }} aria-live="polite">{Math.max(amount, min)}</span>
-              <button className="btn" aria-label="Increase" onClick={() => setAmount(Math.min(v.maxBid, Math.max(amount, min) + 1))}>+</button>
-              <button className="btn primary" onClick={() => client.act({ type: 'bid', amount: Math.max(amount, min) })}>Bid</button>
-              {v.bidder && <button className="btn danger" onClick={() => client.act({ type: 'drop' })}>Drop</button>}
+              <button
+                className="btn"
+                aria-label="Decrease"
+                onClick={() => setAmount(Math.max(min, amount - 1))}
+              >
+                −
+              </button>
+              <span
+                className="num"
+                style={{ fontSize: 40, minWidth: 60, textAlign: 'center' }}
+                aria-live="polite"
+              >
+                {Math.max(amount, min)}
+              </span>
+              <button
+                className="btn"
+                aria-label="Increase"
+                onClick={() => setAmount(Math.min(v.maxBid, Math.max(amount, min) + 1))}
+              >
+                +
+              </button>
+              <button
+                className="btn primary"
+                onClick={() => client.act({ type: 'bid', amount: Math.max(amount, min) })}
+              >
+                Bid
+              </button>
+              {v.bidder && (
+                <button className="btn danger" onClick={() => client.act({ type: 'drop' })}>
+                  Drop
+                </button>
+              )}
             </div>
           </div>
         ) : (
           <Banner>{names[v.turn]} is deciding…</Banner>
-        )
-      )}
+        ))}
       {(v.phase === 'AWAIT_JUDGE' || v.phase === 'CHALLENGE') && (
         <div className="card" style={{ textAlign: 'center' }}>
-          <div className="eyebrow">{names[v.bidder]} must name {v.bid}</div>
-          <div className="num" style={{ fontSize: 72 }} aria-live="polite">{v.count} / {v.bid}</div>
-          {v.phase === 'AWAIT_JUDGE' && <p className="muted">The 30s starts on the judge’s first valid tap.</p>}
+          <div className="eyebrow">
+            {names[v.bidder]} must name {v.bid}
+          </div>
+          <div className="num" style={{ fontSize: 72 }} aria-live="polite">
+            {v.count} / {v.bid}
+          </div>
+          {v.phase === 'AWAIT_JUDGE' && (
+            <p className="muted">The 30s starts on the judge’s first valid tap.</p>
+          )}
         </div>
       )}
       {isJudge && (v.phase === 'AWAIT_JUDGE' || v.phase === 'CHALLENGE') && (
         <div className="card stack">
           <div className="eyebrow">Judge counter</div>
-          <form className="row" style={{ flexWrap: 'nowrap' }} onSubmit={(e) => { e.preventDefault(); void client.act({ type: 'tap', ...(name.trim() ? { name: name.trim() } : {}) }); setName(''); }}>
-            <input className="input" placeholder="Name heard (optional)" value={name} onChange={(e) => setName(e.target.value)} />
+          <form
+            className="row"
+            style={{ flexWrap: 'nowrap' }}
+            onSubmit={(e) => {
+              e.preventDefault();
+              void client.act({ type: 'tap', ...(name.trim() ? { name: name.trim() } : {}) });
+              setName('');
+            }}
+          >
+            <input
+              className="input"
+              placeholder="Name heard (optional)"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
             <button className="btn primary">Valid +1</button>
           </form>
-          <button className="btn" disabled={v.count === 0} onClick={() => client.act({ type: 'undo' })}>Undo last (timer keeps running)</button>
+          <button className="btn" disabled={v.count === 0} onClick={() => client.act({ type: 'undo' })}>
+            Undo last (timer keeps running)
+          </button>
           <details>
             <summary className="small muted">Verified answer universe ({v.universe?.length})</summary>
-            <p className="small" style={{ columns: 2 }}>{v.universe?.join(' · ')}</p>
+            <p className="small" style={{ columns: 2 }}>
+              {v.universe?.join(' · ')}
+            </p>
           </details>
         </div>
       )}
       {v.phase === 'ROUND_REVEAL' && (
         <Banner tone={v.outcome === 'SUCCESS' ? 'ok' : 'bad'}>
-          {v.outcome === 'SUCCESS' ? `${names[v.bidder]} did it: +5` : `${names[v.bidder]} fell short: −2 · ${names[v.challenger] ?? 'challenger'} +5`}
+          {v.outcome === 'SUCCESS'
+            ? `${names[v.bidder]} did it: +5`
+            : `${names[v.bidder]} fell short: −2 · ${names[v.challenger] ?? 'challenger'} +5`}
         </Banner>
       )}
       <Attribution text={v.attribution} />

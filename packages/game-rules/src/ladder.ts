@@ -19,7 +19,10 @@ export interface StandingRow {
  * sole 2nd and sole 3rd finishes. Tied placements do not count as sole finishes (blueprint G,
  * RECOMMENDED). Returns rows sorted and grouped; ties after step 4 stay grouped.
  */
-export function computeStandings(participants: string[], outcomes: ModeOutcome[]): { rows: StandingRow[]; groups: string[][] } {
+export function computeStandings(
+  participants: string[],
+  outcomes: ModeOutcome[],
+): { rows: StandingRow[]; groups: string[][] } {
   const rows = new Map<string, StandingRow>(
     participants.map((m) => [m, { memberId: m, points: Fraction.ZERO, sole1: 0, sole2: 0, sole3: 0 }]),
   );
@@ -64,7 +67,10 @@ export const MAX_TIEBREAK_QUESTIONS = 5;
  * (PROPOSED: all-wrong rounds change nothing). After at most 5 rounds, remaining contenders
  * share the championship. Returns final ordered groups for the original tied set.
  */
-export function resolveTiebreak(tied: string[], rounds: Array<Record<string, boolean>>): { groups: string[][]; done: boolean } {
+export function resolveTiebreak(
+  tied: string[],
+  rounds: Array<Record<string, boolean>>,
+): { groups: string[][]; done: boolean } {
   // Ordered list of groups; first group is contending for the title.
   let contenders = [...tied];
   const below: string[][] = []; // groups eliminated, most recently eliminated first

@@ -43,11 +43,22 @@ export interface SimSpec<I extends ContentItem, A extends SimAnswer, X> {
   initExtra(ctx: EngineCtx): X;
   /** Who answers item i (defaults to all players). */
   eligible?(s: SimState<I, A, X>): string[];
-  parseAnswer(s: SimState<I, A, X>, item: I, memberId: string, action: Record<string, unknown>, now: number): A;
+  parseAnswer(
+    s: SimState<I, A, X>,
+    item: I,
+    memberId: string,
+    action: Record<string, unknown>,
+    now: number,
+  ): A;
   /** Auto-grade. Return 'review' to send to the judge (only used when a judge exists). */
   grade(item: I, ans: A | undefined): boolean | 'review';
   /** Optional non-answer actions during QUESTION (e.g. view hint). */
-  extraAction?(s: SimState<I, A, X>, memberId: string, action: Record<string, unknown>, now: number): SimState<I, A, X>;
+  extraAction?(
+    s: SimState<I, A, X>,
+    memberId: string,
+    action: Record<string, unknown>,
+    now: number,
+  ): SimState<I, A, X>;
   /** Called when an item's REVEAL ends (after adjudications) — e.g. hearts. */
   onItemSettled?(s: SimState<I, A, X>, correct: (i: number, m: string) => boolean | null): SimState<I, A, X>;
   /** Extra absolute game-times during QUESTION when the public view changes (e.g. clue reveals). */
@@ -69,17 +80,19 @@ export function makeSimultaneousEngine<I extends ContentItem, A extends SimAnswe
 ): Engine<SimState<I, A, X>, I> {
   type S = SimState<I, A, X>;
 
-  const correctFn = (s: S) => (i: number, m: string): boolean | null => {
-    if (s.voided.includes(i)) return null;
-    if (s.regraded.includes(`${i}:${m}`)) return true;
-    const key = `${i}:${m}`;
-    if (s.reviewedBy[key] !== undefined) {
-      // reviewed answers are stored on the answer itself
-      return (s.answers[i]?.[m] as unknown as { reviewVerdict?: boolean })?.reviewVerdict === true;
-    }
-    const g = spec.grade(s.items[i]!, s.answers[i]?.[m]);
-    return g === true;
-  };
+  const correctFn =
+    (s: S) =>
+    (i: number, m: string): boolean | null => {
+      if (s.voided.includes(i)) return null;
+      if (s.regraded.includes(`${i}:${m}`)) return true;
+      const key = `${i}:${m}`;
+      if (s.reviewedBy[key] !== undefined) {
+        // reviewed answers are stored on the answer itself
+        return (s.answers[i]?.[m] as unknown as { reviewVerdict?: boolean })?.reviewVerdict === true;
+      }
+      const g = spec.grade(s.items[i]!, s.answers[i]?.[m]);
+      return g === true;
+    };
 
   /** Correctness only for items whose result is public (prevents leaking via live scores). */
   const revealedCorrect = (s: S) => {
@@ -94,8 +107,15 @@ export function makeSimultaneousEngine<I extends ContentItem, A extends SimAnswe
   const eligibleNow = (s: S) => (spec.eligible ? spec.eligible(s) : s.players);
 
   function startItem(s: S, index: number, at: number): S {
-    if (index >= s.items.length) return { ...s, phase: 'DONE', phaseStart: at, phaseEnd: null, index: s.items.length };
-    const next: S = { ...s, index, phase: 'QUESTION', phaseStart: at, phaseEnd: at + spec.questionMs(s.timing) };
+    if (index >= s.items.length)
+      return { ...s, phase: 'DONE', phaseStart: at, phaseEnd: null, index: s.items.length };
+    const next: S = {
+      ...s,
+      index,
+      phase: 'QUESTION',
+      phaseStart: at,
+      phaseEnd: at + spec.questionMs(s.timing),
+    };
     const elig = eligibleNow(next);
     const eligibleByItem = [...s.eligibleByItem];
     eligibleByItem[index] = elig;
@@ -154,26 +174,31 @@ export function makeSimultaneousEngine<I extends ContentItem, A extends SimAnswe
     act(s, actor: Actor, action, now) {
       const type = action.type;
       if (type === 'review') {
-        if (actor.role !== 'JUDGE' || !s.judges.includes(actor.memberId)) throw new GameError('FORBIDDEN', 'Only a judge can review');
+        if (actor.role !== 'JUDGE' || !s.judges.includes(actor.memberId))
+          throw new GameError('FORBIDDEN', 'Only a judge can review');
         if (s.phase !== 'REVIEW') throw new GameError('INVALID_STATE', 'Nothing to review');
         const memberId = String(action.memberId ?? '');
         const key = `${s.index}:${memberId}`;
         if (!s.reviews.includes(key)) throw new GameError('NOT_FOUND', 'No pending review for that player');
-        if (memberId === actor.memberId) throw new GameError('CONFLICT_OF_INTEREST', 'Cannot review own answer');
-        if (typeof action.accept !== 'boolean') throw new GameError('INVALID_MESSAGE', 'accept must be boolean');
+        if (memberId === actor.memberId)
+          throw new GameError('CONFLICT_OF_INTEREST', 'Cannot review own answer');
+        if (typeof action.accept !== 'boolean')
+          throw new GameError('INVALID_MESSAGE', 'accept must be boolean');
         const ans = { ...(s.answers[s.index]![memberId] as A), reviewVerdict: action.accept };
         const answers = [...s.answers];
         answers[s.index] = { ...answers[s.index], [memberId]: ans };
         const reviews = s.reviews.filter((r) => r !== key);
         let n: S = { ...s, answers, reviews, reviewedBy: { ...s.reviewedBy, [key]: actor.memberId } };
-        if (reviews.length === 0) n = { ...n, phase: 'REVEAL', phaseStart: now, phaseEnd: now + s.timing.appealWindow };
+        if (reviews.length === 0)
+          n = { ...n, phase: 'REVEAL', phaseStart: now, phaseEnd: now + s.timing.appealWindow };
         return n;
       }
       if (actor.role !== 'PLAYER') throw new GameError('FORBIDDEN', 'Only players can answer');
       if (s.phase !== 'QUESTION') throw new GameError('INVALID_STATE', 'No question is open');
       if (s.phaseEnd !== null && now >= s.phaseEnd) throw new GameError('DEADLINE_PASSED', 'Time is up');
       const elig = s.eligibleByItem[s.index] ?? [];
-      if (!elig.includes(actor.memberId)) throw new GameError('FORBIDDEN', 'You are not answering this question');
+      if (!elig.includes(actor.memberId))
+        throw new GameError('FORBIDDEN', 'You are not answering this question');
       if (typeof action.itemIndex === 'number' && action.itemIndex !== s.index)
         throw new GameError('STALE_VERSION', 'Answer is for a different question');
       if (type !== 'answer') {
@@ -213,11 +238,18 @@ export function makeSimultaneousEngine<I extends ContentItem, A extends SimAnswe
     },
     appealWindows(s, now) {
       if (s.phase !== 'REVEAL' || s.phaseEnd === null || now >= s.phaseEnd) return [];
-      return [{ itemIndex: s.index, closesAt: s.phaseEnd, eligible: s.eligibleByItem[s.index] ?? [] } satisfies AppealWindow];
+      return [
+        {
+          itemIndex: s.index,
+          closesAt: s.phaseEnd,
+          eligible: s.eligibleByItem[s.index] ?? [],
+        } satisfies AppealWindow,
+      ];
     },
     adjudicate(s, adj: Adjudication) {
       if (adj.decision === 'REJECT') return s;
-      if (adj.decision === 'VOID') return s.voided.includes(adj.itemIndex) ? s : { ...s, voided: [...s.voided, adj.itemIndex] };
+      if (adj.decision === 'VOID')
+        return s.voided.includes(adj.itemIndex) ? s : { ...s, voided: [...s.voided, adj.itemIndex] };
       const key = `${adj.itemIndex}:${adj.claimantId}`;
       return s.regraded.includes(key) ? s : { ...s, regraded: [...s.regraded, key] };
     },
@@ -229,7 +261,8 @@ export function makeSimultaneousEngine<I extends ContentItem, A extends SimAnswe
       const correct = revealedCorrect(s);
       const sc = spec.scores(s, correct);
       const answers = s.answers[i] ?? {};
-      const isJudge = viewer.role === 'JUDGE' && viewer.memberId !== null && s.judges.includes(viewer.memberId);
+      const isJudge =
+        viewer.role === 'JUDGE' && viewer.memberId !== null && s.judges.includes(viewer.memberId);
       return {
         mode: s.mode,
         phase: s.phase,
@@ -247,7 +280,14 @@ export function makeSimultaneousEngine<I extends ContentItem, A extends SimAnswe
             const own = viewer.memberId === m;
             if (!a) return [m, { answered: false }];
             if (!revealed && !own) return [m, { answered: true }];
-            return [m, { answered: true, answer: spec.viewAnswer(a, item!), correct: revealed ? correct(i, m) : undefined }];
+            return [
+              m,
+              {
+                answered: true,
+                answer: spec.viewAnswer(a, item!),
+                correct: revealed ? correct(i, m) : undefined,
+              },
+            ];
           }),
         ),
         voided: s.voided.includes(i),

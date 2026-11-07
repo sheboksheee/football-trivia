@@ -72,7 +72,8 @@ function scores(s: TimelineState): Record<string, string> {
 }
 
 function begin(s: TimelineState, d: number, at: number): TimelineState {
-  if (d >= s.duels.length) return { ...s, d: s.duels.length - 1, phase: 'DONE', phaseStart: at, phaseEnd: null };
+  if (d >= s.duels.length)
+    return { ...s, d: s.duels.length - 1, phase: 'DONE', phaseStart: at, phaseEnd: null };
   return { ...s, d, phase: 'INTRO', phaseStart: at, phaseEnd: at + s.timing.timelineIntro };
 }
 
@@ -82,9 +83,25 @@ export const timelineEngine: Engine<TimelineState, TimelineItem> = {
   supportedDecisions: ['ACCEPT', 'REJECT', 'VOID'] as AppealDecision[],
   itemsNeeded: (n) => n * TIMELINE_CHALLENGES_EACH,
   init(ctx, items, now) {
-    const duels = timelinePairings(ctx.players).map(([initiator, opponent]) => ({ initiator, opponent, picks: {} }));
+    const duels = timelinePairings(ctx.players).map(([initiator, opponent]) => ({
+      initiator,
+      opponent,
+      picks: {},
+    }));
     return begin(
-      { mode: 'timeline', players: [...ctx.players], timing: ctx.timing, items: items.slice(0, duels.length), duels, d: 0, phase: 'INTRO', phaseStart: now, phaseEnd: null, voided: [], regraded: [] },
+      {
+        mode: 'timeline',
+        players: [...ctx.players],
+        timing: ctx.timing,
+        items: items.slice(0, duels.length),
+        duels,
+        d: 0,
+        phase: 'INTRO',
+        phaseStart: now,
+        phaseEnd: null,
+        voided: [],
+        regraded: [],
+      },
       0,
       now,
     );
@@ -98,16 +115,20 @@ export const timelineEngine: Engine<TimelineState, TimelineItem> = {
     if (s.phaseEnd !== null && now >= s.phaseEnd) throw new GameError('DEADLINE_PASSED', 'Time is up');
     if (duel.picks[actor.memberId]) throw new GameError('DUPLICATE', 'Already answered');
     const id = action.eventId;
-    if (typeof id !== 'string' || !s.items[s.d]!.events.some((e) => e.id === id)) throw new GameError('INVALID_MESSAGE', 'Unknown event');
+    if (typeof id !== 'string' || !s.items[s.d]!.events.some((e) => e.id === id))
+      throw new GameError('INVALID_MESSAGE', 'Unknown event');
     const duels = [...s.duels];
     duels[s.d] = { ...duel, picks: { ...duel.picks, [actor.memberId]: id } };
     const n = { ...s, duels };
-    if (Object.keys(duels[s.d]!.picks).length === 2) return { ...n, phase: 'REVEAL', phaseStart: now, phaseEnd: now + s.timing.appealWindow };
+    if (Object.keys(duels[s.d]!.picks).length === 2)
+      return { ...n, phase: 'REVEAL', phaseStart: now, phaseEnd: now + s.timing.appealWindow };
     return n;
   },
   step(s, d) {
-    if (s.phase === 'INTRO') return { ...s, phase: 'ANSWER', phaseStart: d, phaseEnd: d + s.timing.timelineAnswer };
-    if (s.phase === 'ANSWER') return { ...s, phase: 'REVEAL', phaseStart: d, phaseEnd: d + s.timing.appealWindow };
+    if (s.phase === 'INTRO')
+      return { ...s, phase: 'ANSWER', phaseStart: d, phaseEnd: d + s.timing.timelineAnswer };
+    if (s.phase === 'ANSWER')
+      return { ...s, phase: 'REVEAL', phaseStart: d, phaseEnd: d + s.timing.appealWindow };
     if (s.phase === 'REVEAL') return begin(s, s.d + 1, d);
     return s;
   },
@@ -122,9 +143,11 @@ export const timelineEngine: Engine<TimelineState, TimelineItem> = {
     return [{ itemIndex: s.d, closesAt: s.phaseEnd, eligible: [duel.initiator, duel.opponent] }];
   },
   adjudicate(s, adj) {
-    if (adj.decision === 'VOID' && !s.voided.includes(adj.itemIndex)) return { ...s, voided: [...s.voided, adj.itemIndex] };
+    if (adj.decision === 'VOID' && !s.voided.includes(adj.itemIndex))
+      return { ...s, voided: [...s.voided, adj.itemIndex] };
     const key = `${adj.itemIndex}:${adj.claimantId}`;
-    if (adj.decision === 'ACCEPT' && !s.regraded.includes(key)) return { ...s, regraded: [...s.regraded, key] };
+    if (adj.decision === 'ACCEPT' && !s.regraded.includes(key))
+      return { ...s, regraded: [...s.regraded, key] };
     return s;
   },
   gradedBy: () => null,
@@ -143,11 +166,28 @@ export const timelineEngine: Engine<TimelineState, TimelineItem> = {
       initiator: duel.initiator,
       opponent: duel.opponent,
       inDuel,
-      item: s.phase === 'INTRO' ? null : { prompt: item.prompt, events: item.events.map((e) => ({ id: e.id, label: e.label, date: revealed ? e.date : null })), earlierId: revealed ? item.earlierId : null, attribution: revealed ? item.meta.attribution : null },
+      item:
+        s.phase === 'INTRO'
+          ? null
+          : {
+              prompt: item.prompt,
+              events: item.events.map((e) => ({ id: e.id, label: e.label, date: revealed ? e.date : null })),
+              earlierId: revealed ? item.earlierId : null,
+              attribution: revealed ? item.meta.attribution : null,
+            },
       picks: Object.fromEntries(
-        [duel.initiator, duel.opponent].map((m) => [m, revealed || viewer.memberId === m ? (duel.picks[m] ?? null) : duel.picks[m] ? 'HIDDEN' : null]),
+        [duel.initiator, duel.opponent].map((m) => [
+          m,
+          revealed || viewer.memberId === m ? (duel.picks[m] ?? null) : duel.picks[m] ? 'HIDDEN' : null,
+        ]),
       ),
-      correct: revealed && !s.voided.includes(s.d) ? { [duel.initiator]: correctOf(s, s.d, duel.initiator), [duel.opponent]: correctOf(s, s.d, duel.opponent) } : null,
+      correct:
+        revealed && !s.voided.includes(s.d)
+          ? {
+              [duel.initiator]: correctOf(s, s.d, duel.initiator),
+              [duel.opponent]: correctOf(s, s.d, duel.opponent),
+            }
+          : null,
       voided: s.voided.includes(s.d),
       scores: scores(s),
     };

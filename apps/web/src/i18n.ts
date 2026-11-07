@@ -196,7 +196,11 @@ export type Locale = 'en' | 'ar';
 export const DICTS: Record<Locale, Dict> = { en, ar };
 export type TKey = keyof Dict;
 
-export const I18nContext = createContext<{ locale: Locale; t: (k: TKey) => string; setLocale: (l: Locale) => void }>({
+export const I18nContext = createContext<{
+  locale: Locale;
+  t: (k: TKey) => string;
+  setLocale: (l: Locale) => void;
+}>({
   locale: 'en',
   t: (k) => en[k],
   setLocale: () => {},

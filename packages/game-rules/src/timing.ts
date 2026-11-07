@@ -67,7 +67,9 @@ export const DEFAULT_TIMING: Timing = {
 export function scaleTiming(t: Timing, factor: number): Timing {
   const out: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(t)) {
-    out[k] = Array.isArray(v) ? v.map((x: number) => Math.round(x * factor)) : Math.round((v as number) * factor);
+    out[k] = Array.isArray(v)
+      ? v.map((x: number) => Math.round(x * factor))
+      : Math.round((v as number) * factor);
   }
   return out as unknown as Timing;
 }

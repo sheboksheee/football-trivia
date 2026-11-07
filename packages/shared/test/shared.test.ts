@@ -70,10 +70,30 @@ describe('mode catalog', () => {
 
 describe('protocol validation', () => {
   it('accepts valid commands and rejects malformed', () => {
-    expect(ClientCommand.safeParse({ type: 'room.join', payload: { code: 'abcdef', displayName: 'Sam', role: 'PLAYER' } }).success).toBe(true);
-    expect(ClientCommand.safeParse({ type: 'room.join', payload: { code: 'abc', displayName: 'Sam', role: 'PLAYER' } }).success).toBe(false);
-    expect(ClientCommand.safeParse({ type: 'room.join', payload: { code: 'ABCDEF', displayName: '<script>', role: 'PLAYER' } }).success).toBe(false);
-    expect(ClientCommand.safeParse({ type: 'room.join', payload: { code: 'ABCDEF', displayName: 'x', role: 'HOST' } }).success).toBe(false);
+    expect(
+      ClientCommand.safeParse({
+        type: 'room.join',
+        payload: { code: 'abcdef', displayName: 'Sam', role: 'PLAYER' },
+      }).success,
+    ).toBe(true);
+    expect(
+      ClientCommand.safeParse({
+        type: 'room.join',
+        payload: { code: 'abc', displayName: 'Sam', role: 'PLAYER' },
+      }).success,
+    ).toBe(false);
+    expect(
+      ClientCommand.safeParse({
+        type: 'room.join',
+        payload: { code: 'ABCDEF', displayName: '<script>', role: 'PLAYER' },
+      }).success,
+    ).toBe(false);
+    expect(
+      ClientCommand.safeParse({
+        type: 'room.join',
+        payload: { code: 'ABCDEF', displayName: 'x', role: 'HOST' },
+      }).success,
+    ).toBe(false);
     expect(ClientCommand.safeParse({ type: 'nope', payload: {} }).success).toBe(false);
   });
 });

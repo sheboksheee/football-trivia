@@ -50,7 +50,15 @@ export class GameClient {
   private retry = 0;
   private wantOpen = false;
   private session: Session | null = loadSession();
-  snap: Snapshot = { status: 'idle', view: null, receivedAt: 0, memberId: null, roomCode: null, kicked: null, lastError: null };
+  snap: Snapshot = {
+    status: 'idle',
+    view: null,
+    receivedAt: 0,
+    memberId: null,
+    roomCode: null,
+    kicked: null,
+    lastError: null,
+  };
 
   constructor(private readonly url = defaultUrl()) {}
 
@@ -70,7 +78,8 @@ export class GameClient {
 
   connect(): Promise<void> {
     this.wantOpen = true;
-    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) return this.ready();
+    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING))
+      return this.ready();
     this.set({ status: this.retry > 0 ? 'reconnecting' : 'connecting' });
     const ws = new WebSocket(this.url);
     this.ws = ws;
@@ -83,7 +92,8 @@ export class GameClient {
     ws.onclose = () => {
       this.ws = null;
       for (const [, p] of this.pending) clearTimeout(p.timer);
-      for (const [id, p] of this.pending) p.ok({ t: 'ack', id, ok: false, error: { code: 'INTERNAL', message: 'Connection lost' } });
+      for (const [id, p] of this.pending)
+        p.ok({ t: 'ack', id, ok: false, error: { code: 'INTERNAL', message: 'Connection lost' } });
       this.pending.clear();
       if (!this.wantOpen) return this.set({ status: 'idle' });
       this.set({ status: 'reconnecting' });
@@ -139,7 +149,13 @@ export class GameClient {
         ok({ t: 'ack', id, ok: false, error: { code: 'INTERNAL', message: 'Server did not respond' } });
       }, 10_000);
       this.pending.set(id, { ok, timer });
-      this.ws!.send(JSON.stringify({ id, command, ...(opts.expectedVersion !== undefined ? { expectedVersion: opts.expectedVersion } : {}) }));
+      this.ws!.send(
+        JSON.stringify({
+          id,
+          command,
+          ...(opts.expectedVersion !== undefined ? { expectedVersion: opts.expectedVersion } : {}),
+        }),
+      );
     });
   }
 
@@ -153,7 +169,12 @@ export class GameClient {
     if (!s || (code && s.code !== code)) return null;
     this.set({ roomCode: s.code });
     const ack = await this.send({ type: 'session.resume', payload: { code: s.code, resumeToken: s.token } });
-    if (!ack.ok && (ack.error?.code === 'UNAUTHORIZED' || ack.error?.code === 'FORBIDDEN' || ack.error?.code === 'NOT_FOUND')) {
+    if (
+      !ack.ok &&
+      (ack.error?.code === 'UNAUTHORIZED' ||
+        ack.error?.code === 'FORBIDDEN' ||
+        ack.error?.code === 'NOT_FOUND')
+    ) {
       this.session = null;
       saveSession(null);
       this.set({ roomCode: null, view: null });

@@ -1,9 +1,25 @@
 import { describe, expect, it } from 'vitest';
 import { createRng, matchesAlias, type McqItem } from '@ft/shared';
 import {
-  CROSSCHECK_SOURCE_ID, estimateDifficulty, fixtureSnapshots, generateCandidates, generateLeague, MIN_CALIBRATION_SAMPLE,
-  normalize, PENDING_SOURCE_ID, primaryFailure, QuestionBank, recordAttempts, ReviewError, riskExpectedValues, runGates,
-  runPipeline, SOURCES, STRICT_POLICY, syntheticAdapter, verify,
+  CROSSCHECK_SOURCE_ID,
+  estimateDifficulty,
+  fixtureSnapshots,
+  generateCandidates,
+  generateLeague,
+  MIN_CALIBRATION_SAMPLE,
+  normalize,
+  PENDING_SOURCE_ID,
+  primaryFailure,
+  QuestionBank,
+  recordAttempts,
+  ReviewError,
+  riskExpectedValues,
+  runGates,
+  runPipeline,
+  SOURCES,
+  STRICT_POLICY,
+  syntheticAdapter,
+  verify,
 } from '../src/index.js';
 
 const result = runPipeline();
@@ -19,7 +35,9 @@ describe('fixture provenance', () => {
   it('real-world providers are candidates only: pending license, not integrated', () => {
     const real = SOURCES.filter((s) => s.kind !== 'SYNTHETIC_FIXTURE');
     expect(real.length).toBeGreaterThan(5);
-    expect(real.every((s) => s.licenseStatus === 'PENDING' && !s.integrated && !s.autoApproveEligible)).toBe(true);
+    expect(real.every((s) => s.licenseStatus === 'PENDING' && !s.integrated && !s.autoApproveEligible)).toBe(
+      true,
+    );
   });
   it('adapter contract returns NOT_SUPPORTED explicitly', async () => {
     const ad = syntheticAdapter();
@@ -33,7 +51,9 @@ describe('publication gates (acceptance)', () => {
   it('source conflict quarantines every dependent question', () => {
     const conflicted = new Set(result.kb.facts.filter((f) => f.status === 'CONFLICTED').map((f) => f.id));
     expect(result.conflicts.length).toBe(6);
-    expect(result.conflicts.every((c) => c.values.some((v) => v.sourceId === CROSSCHECK_SOURCE_ID))).toBe(true);
+    expect(result.conflicts.every((c) => c.values.some((v) => v.sourceId === CROSSCHECK_SOURCE_ID))).toBe(
+      true,
+    );
     const dependents = all.filter((q) => q.factIds.some((id) => conflicted.has(id)));
     expect(dependents.length).toBeGreaterThan(0);
     expect(dependents.every((q) => q.status === 'QUARANTINED' || q.status === 'BLOCKED_RIGHTS')).toBe(true);
@@ -48,7 +68,17 @@ describe('publication gates (acceptance)', () => {
     verify(kb);
     const cand = generateCandidates(kb).find((c) => c.template === 'mcq.top_scorer_club_season')!;
     // Tamper: make the validator see two satisfying options by re-running gates with a forced failure
-    const tampered = { ...cand, validators: [{ gate: 'DISTRACTORS' as const, passed: false, failureStatus: 'REJECTED' as const, message: 'More than one option satisfies the stem' }] };
+    const tampered = {
+      ...cand,
+      validators: [
+        {
+          gate: 'DISTRACTORS' as const,
+          passed: false,
+          failureStatus: 'REJECTED' as const,
+          message: 'More than one option satisfies the stem',
+        },
+      ],
+    };
     expect(primaryFailure(runGates(tampered, kb, new Set()))).toBe('REJECTED');
     expect(primaryFailure(runGates(cand, kb, new Set([cand.fingerprint])))).toBe('DUPLICATE');
   });
@@ -80,7 +110,8 @@ describe('publication gates (acceptance)', () => {
   });
   it('Connections with an alternate shared club are rejected; Missing XI hints never leak the answer', () => {
     const conn = all.filter((q) => q.kind === 'connection');
-    for (const q of conn.filter((x) => x.status === 'PUBLISHED')) expect(q.gates.find((g) => g.message.startsWith('Alternate link'))).toBeUndefined();
+    for (const q of conn.filter((x) => x.status === 'PUBLISHED'))
+      expect(q.gates.find((g) => g.message.startsWith('Alternate link'))).toBeUndefined();
     for (const q of all.filter((x) => x.kind === 'missing_xi' && x.status === 'PUBLISHED')) {
       if (q.item.kind !== 'missing_xi') continue;
       const it = q.item;
@@ -97,7 +128,17 @@ describe('publication gates (acceptance)', () => {
   it('there is enough published content for every playable mode', () => {
     const c = result.bank.counts();
     expect(c.mcq!.PUBLISHED!).toBeGreaterThan(36 + 15 + 5);
-    for (const k of ['higher_lower', 'short_answer', 'connection', 'timeline', 'impostor', 'missing_xi', 'guess_match', 'top25', 'auction'])
+    for (const k of [
+      'higher_lower',
+      'short_answer',
+      'connection',
+      'timeline',
+      'impostor',
+      'missing_xi',
+      'guess_match',
+      'top25',
+      'auction',
+    ])
       expect(c[k]!.PUBLISHED ?? 0).toBeGreaterThanOrEqual(k === 'top25' ? 1 : 6);
   });
 });
@@ -111,7 +152,12 @@ describe('review workflow', () => {
     expect(pub.status).toBe('PUBLISHED');
     expect(strict.review(q.id, 'RETIRE', 'admin', 'stale').status).toBe('RETIRED');
     expect(strict.review(q.id, 'RESTORE', 'admin', 'fixed').status).toBe('NEEDS_REVIEW');
-    expect(strict.get(q.id)!.audit.map((a) => a.action).slice(-3)).toEqual(['review.approve', 'review.retire', 'review.restore']);
+    expect(
+      strict
+        .get(q.id)!
+        .audit.map((a) => a.action)
+        .slice(-3),
+    ).toEqual(['review.approve', 'review.retire', 'review.restore']);
     const blocked = strict.all().find((x) => x.status === 'BLOCKED_RIGHTS')!;
     expect(() => strict.review(blocked.id, 'APPROVE', 'admin', 'force it')).toThrow(/Cannot APPROVE/);
     const quarantined = strict.all().find((x) => x.status === 'QUARANTINED')!;
@@ -130,7 +176,13 @@ describe('review workflow', () => {
 });
 
 describe('difficulty engine', () => {
-  const d = estimateDifficulty({ rarity: 50, complexity: 50, distractorSimilarity: 50, temporalDistance: 50, recallDepth: 50 });
+  const d = estimateDifficulty({
+    rarity: 50,
+    complexity: 50,
+    distractorSimilarity: 50,
+    temporalDistance: 50,
+    recallDepth: 50,
+  });
   it('heuristic estimate uses documented weights', () => {
     expect(d.estimate).toBe(50);
     expect(d.tier).toBe('MEDIUM');

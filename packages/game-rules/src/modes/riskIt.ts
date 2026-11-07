@@ -57,7 +57,8 @@ function scores(s: RiskState): Record<string, string> {
 }
 
 function begin(s: RiskState, t: number, at: number): RiskState {
-  if (t >= s.turns.length) return { ...s, t: s.turns.length - 1, phase: 'DONE', phaseStart: at, phaseEnd: null };
+  if (t >= s.turns.length)
+    return { ...s, t: s.turns.length - 1, phase: 'DONE', phaseStart: at, phaseEnd: null };
   return { ...s, t, phase: 'CHOOSE', phaseStart: at, phaseEnd: at + s.timing.riskChoose };
 }
 
@@ -75,7 +76,8 @@ export const riskItEngine: Engine<RiskState, McqItem> = {
   init(ctx, items, now) {
     const turns: Turn[] = [];
     for (let r = 0; r < RISK_TURNS_EACH; r++)
-      for (const p of ctx.players) turns.push({ player: p, risk: null, riskDefaulted: false, optionId: null, answeredAt: null });
+      for (const p of ctx.players)
+        turns.push({ player: p, risk: null, riskDefaulted: false, optionId: null, answeredAt: null });
     const s: RiskState = {
       mode: 'risk_it',
       players: [...ctx.players],
@@ -93,28 +95,47 @@ export const riskItEngine: Engine<RiskState, McqItem> = {
   },
   act(s, actor, action, now) {
     const turn = s.turns[s.t]!;
-    if (actor.role !== 'PLAYER' || actor.memberId !== turn.player) throw new GameError('FORBIDDEN', 'Not your turn');
+    if (actor.role !== 'PLAYER' || actor.memberId !== turn.player)
+      throw new GameError('FORBIDDEN', 'Not your turn');
     if (s.phaseEnd !== null && now >= s.phaseEnd) throw new GameError('DEADLINE_PASSED', 'Time is up');
     if (action.type === 'risk') {
       if (s.phase !== 'CHOOSE') throw new GameError('INVALID_STATE', 'Risk already chosen');
       const risk = action.risk;
-      if (risk !== 'SAFE' && risk !== 'BOLD' && risk !== 'ALL_IN') throw new GameError('INVALID_MESSAGE', 'Invalid risk');
-      return { ...updateTurn(s, { risk }), phase: 'ANSWER', phaseStart: now, phaseEnd: now + s.timing.riskAnswer };
+      if (risk !== 'SAFE' && risk !== 'BOLD' && risk !== 'ALL_IN')
+        throw new GameError('INVALID_MESSAGE', 'Invalid risk');
+      return {
+        ...updateTurn(s, { risk }),
+        phase: 'ANSWER',
+        phaseStart: now,
+        phaseEnd: now + s.timing.riskAnswer,
+      };
     }
     if (action.type === 'answer') {
       if (s.phase !== 'ANSWER') throw new GameError('INVALID_STATE', 'Not answering now');
       const id = action.optionId;
-      if (typeof id !== 'string' || !s.items[s.t]!.options.some((o) => o.id === id)) throw new GameError('INVALID_MESSAGE', 'Unknown option');
-      return { ...updateTurn(s, { optionId: id, answeredAt: now }), phase: 'REVEAL', phaseStart: now, phaseEnd: now + s.timing.appealWindow };
+      if (typeof id !== 'string' || !s.items[s.t]!.options.some((o) => o.id === id))
+        throw new GameError('INVALID_MESSAGE', 'Unknown option');
+      return {
+        ...updateTurn(s, { optionId: id, answeredAt: now }),
+        phase: 'REVEAL',
+        phaseStart: now,
+        phaseEnd: now + s.timing.appealWindow,
+      };
     }
     throw new GameError('INVALID_MESSAGE', 'Unknown action');
   },
   step(s, d) {
     if (s.phase === 'CHOOSE') {
       // PROPOSED: no risk chosen in time => SAFE.
-      return { ...updateTurn(s, { risk: 'SAFE', riskDefaulted: true }), phase: 'ANSWER', phaseStart: d, phaseEnd: d + s.timing.riskAnswer };
+      return {
+        ...updateTurn(s, { risk: 'SAFE', riskDefaulted: true }),
+        phase: 'ANSWER',
+        phaseStart: d,
+        phaseEnd: d + s.timing.riskAnswer,
+      };
     }
-    if (s.phase === 'ANSWER') return { ...s, phase: 'REVEAL', phaseStart: d, phaseEnd: d + s.timing.appealWindow };
+    if (s.phase === 'ANSWER')
+      return { ...s, phase: 'REVEAL', phaseStart: d, phaseEnd: d + s.timing.appealWindow };
     if (s.phase === 'REVEAL') return begin(s, s.t + 1, d);
     return s;
   },
@@ -128,8 +149,10 @@ export const riskItEngine: Engine<RiskState, McqItem> = {
       ? [{ itemIndex: s.t, closesAt: s.phaseEnd, eligible: [s.turns[s.t]!.player] }]
       : [],
   adjudicate(s, adj) {
-    if (adj.decision === 'VOID' && !s.voided.includes(adj.itemIndex)) return { ...s, voided: [...s.voided, adj.itemIndex] };
-    if (adj.decision === 'ACCEPT' && !s.regraded.includes(adj.itemIndex)) return { ...s, regraded: [...s.regraded, adj.itemIndex] };
+    if (adj.decision === 'VOID' && !s.voided.includes(adj.itemIndex))
+      return { ...s, voided: [...s.voided, adj.itemIndex] };
+    if (adj.decision === 'ACCEPT' && !s.regraded.includes(adj.itemIndex))
+      return { ...s, regraded: [...s.regraded, adj.itemIndex] };
     return s;
   },
   gradedBy: () => null,
@@ -152,9 +175,16 @@ export const riskItEngine: Engine<RiskState, McqItem> = {
       item: showQuestion ? viewMcq(s.items[s.t]!, revealed) : null,
       answer: revealed ? turn.optionId : null,
       correct: revealed ? correctOf(s, s.t) : null,
-      delta: revealed && turn.risk ? (correctOf(s, s.t) === null ? 0 : riskPoints(turn.risk, correctOf(s, s.t)!)) : null,
+      delta:
+        revealed && turn.risk
+          ? correctOf(s, s.t) === null
+            ? 0
+            : riskPoints(turn.risk, correctOf(s, s.t)!)
+          : null,
       scores: scores(s),
-      history: s.turns.slice(0, settledUpTo(s)).map((tt, i) => ({ player: tt.player, risk: tt.risk, correct: correctOf(s, i) })),
+      history: s.turns
+        .slice(0, settledUpTo(s))
+        .map((tt, i) => ({ player: tt.player, risk: tt.risk, correct: correctOf(s, i) })),
     };
   },
 };

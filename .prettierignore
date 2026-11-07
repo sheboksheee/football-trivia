@@ -2,3 +2,6 @@ docs/reference
 pnpm-lock.yaml
 dist
 coverage
+tests/e2e/test-results
+docs
+*.md

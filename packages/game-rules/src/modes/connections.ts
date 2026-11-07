@@ -11,7 +11,11 @@ type S = SimState<ConnectionItem, ConnAnswer, null>;
  * APPROVED: earliest valid correct +3, other correct +2. Ordering uses server receipt
  * (timestamp, then receipt sequence) of the submission — not grading time.
  */
-export function connectionsItemPoints(s: S, i: number, correct: (i: number, m: string) => boolean | null): Record<string, number> {
+export function connectionsItemPoints(
+  s: S,
+  i: number,
+  correct: (i: number, m: string) => boolean | null,
+): Record<string, number> {
   const ans = s.answers[i] ?? {};
   const right = Object.entries(ans)
     .filter(([m]) => correct(i, m) === true)
@@ -32,11 +36,13 @@ export const connectionsEngine = makeSimultaneousEngine<ConnectionItem, ConnAnsw
     if (!text || text.length > 80) throw new GameError('INVALID_MESSAGE', 'Answer must be 1–80 characters');
     return { at: now, text, seq: Object.keys(s.answers[s.index] ?? {}).length };
   },
-  grade: (item, ans) => (ans === undefined ? false : matchesAlias(ans.text, [item.link, ...item.aliases]) ? true : 'review'),
+  grade: (item, ans) =>
+    ans === undefined ? false : matchesAlias(ans.text, [item.link, ...item.aliases]) ? true : 'review',
   scores(s, correct) {
     const totals: Record<string, number> = Object.fromEntries(s.players.map((p) => [p, 0]));
     s.items.forEach((_, i) => {
-      for (const [m, p] of Object.entries(connectionsItemPoints(s, i, correct))) totals[m] = (totals[m] ?? 0) + p;
+      for (const [m, p] of Object.entries(connectionsItemPoints(s, i, correct)))
+        totals[m] = (totals[m] ?? 0) + p;
     });
     return Object.fromEntries(Object.entries(totals).map(([k, v]) => [k, String(v)]));
   },

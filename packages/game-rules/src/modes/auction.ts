@@ -37,7 +37,10 @@ export interface AuctionState {
 }
 
 export function tapCount(round: Pick<Round, 'taps'>): number {
-  return Math.max(0, round.taps.reduce((a, t) => a + t.delta, 0));
+  return Math.max(
+    0,
+    round.taps.reduce((a, t) => a + t.delta, 0),
+  );
 }
 
 function outcomeOf(s: AuctionState, r: number): 'SUCCESS' | 'FAILURE' | null {
@@ -60,7 +63,8 @@ function settledUpTo(s: AuctionState) {
 
 function scores(s: AuctionState): Record<string, string> {
   const out: Record<string, number> = Object.fromEntries(s.players.map((p) => [p, 0]));
-  for (let r = 0; r < settledUpTo(s); r++) for (const [m, p] of Object.entries(auctionRoundPoints(s, r))) out[m] = (out[m] ?? 0) + p;
+  for (let r = 0; r < settledUpTo(s); r++)
+    for (const [m, p] of Object.entries(auctionRoundPoints(s, r))) out[m] = (out[m] ?? 0) + p;
   return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, String(v)]));
 }
 
@@ -71,7 +75,8 @@ function patchRound(s: AuctionState, patch: Partial<Round>): AuctionState {
 }
 
 function startRound(s: AuctionState, r: number, at: number): AuctionState {
-  if (r >= s.rounds.length) return { ...s, r: s.rounds.length - 1, phase: 'DONE', phaseStart: at, phaseEnd: null };
+  if (r >= s.rounds.length)
+    return { ...s, r: s.rounds.length - 1, phase: 'DONE', phaseStart: at, phaseEnd: null };
   return { ...s, r, phase: 'BIDDING', phaseStart: at, phaseEnd: at + s.timing.auctionBid };
 }
 
@@ -86,7 +91,13 @@ function nextTurn(players: string[], active: string[], from: string, bidder: str
   return from;
 }
 
-function applyBid(s: AuctionState, player: string, amount: number | 'DROP', at: number, auto: boolean): AuctionState {
+function applyBid(
+  s: AuctionState,
+  player: string,
+  amount: number | 'DROP',
+  at: number,
+  auto: boolean,
+): AuctionState {
   const round = s.rounds[s.r]!;
   const max = s.items[s.r]!.universe.length;
   const bids = [...round.bids, { player, amount, at, auto }];
@@ -97,27 +108,52 @@ function applyBid(s: AuctionState, player: string, amount: number | 'DROP', at: 
     if (active.length === 1 && active[0] === round.bidder) {
       return { ...n, phase: 'AWAIT_JUDGE', phaseStart: at, phaseEnd: at + s.timing.auctionJudgeStart };
     }
-    return { ...patchRound(n, { turn: nextTurn(s.players, active, player, round.bidder) }), phaseStart: at, phaseEnd: at + s.timing.auctionBid };
+    return {
+      ...patchRound(n, { turn: nextTurn(s.players, active, player, round.bidder) }),
+      phaseStart: at,
+      phaseEnd: at + s.timing.auctionBid,
+    };
   }
-  if (!Number.isInteger(amount) || amount <= round.bid || amount < 1) throw new GameError('RULE_VIOLATION', `Bid must be more than ${round.bid}`);
+  if (!Number.isInteger(amount) || amount <= round.bid || amount < 1)
+    throw new GameError('RULE_VIOLATION', `Bid must be more than ${round.bid}`);
   if (amount > max) throw new GameError('RULE_VIOLATION', `Bid cannot exceed ${max}`);
   const n = patchRound(s, { bids, bid: amount, bidder: player });
   const others = round.active.filter((p) => p !== player);
-  if (others.length === 0) return { ...n, phase: 'AWAIT_JUDGE', phaseStart: at, phaseEnd: at + s.timing.auctionJudgeStart };
+  if (others.length === 0)
+    return { ...n, phase: 'AWAIT_JUDGE', phaseStart: at, phaseEnd: at + s.timing.auctionJudgeStart };
   if (amount === max) {
     // Nobody can outbid the maximum; remaining players drop in seat order, the last one becomes challenger.
     const order = s.players.filter((p) => others.includes(p));
-    return { ...patchRound(n, { active: [player], lastDropper: order[order.length - 1]! }), phase: 'AWAIT_JUDGE', phaseStart: at, phaseEnd: at + s.timing.auctionJudgeStart };
+    return {
+      ...patchRound(n, { active: [player], lastDropper: order[order.length - 1]! }),
+      phase: 'AWAIT_JUDGE',
+      phaseStart: at,
+      phaseEnd: at + s.timing.auctionJudgeStart,
+    };
   }
-  return { ...patchRound(n, { turn: nextTurn(s.players, round.active, player, player) }), phaseStart: at, phaseEnd: at + s.timing.auctionBid };
+  return {
+    ...patchRound(n, { turn: nextTurn(s.players, round.active, player, player) }),
+    phaseStart: at,
+    phaseEnd: at + s.timing.auctionBid,
+  };
 }
 
 function startChallenge(s: AuctionState, at: number): AuctionState {
-  return { ...patchRound(s, { challengeStart: at }), phase: 'CHALLENGE', phaseStart: at, phaseEnd: at + s.timing.auctionChallenge };
+  return {
+    ...patchRound(s, { challengeStart: at }),
+    phase: 'CHALLENGE',
+    phaseStart: at,
+    phaseEnd: at + s.timing.auctionChallenge,
+  };
 }
 
 function finishRound(s: AuctionState, outcome: 'SUCCESS' | 'FAILURE', at: number): AuctionState {
-  return { ...patchRound(s, { outcome }), phase: 'ROUND_REVEAL', phaseStart: at, phaseEnd: at + s.timing.appealWindow };
+  return {
+    ...patchRound(s, { outcome }),
+    phase: 'ROUND_REVEAL',
+    phaseStart: at,
+    phaseEnd: at + s.timing.appealWindow,
+  };
 }
 
 export const auctionEngine: Engine<AuctionState, AuctionItem> = {
@@ -126,30 +162,72 @@ export const auctionEngine: Engine<AuctionState, AuctionItem> = {
   supportedDecisions: ['ACCEPT', 'REJECT', 'VOID'] as AppealDecision[],
   itemsNeeded: (n) => n,
   init(ctx, items, now) {
-    if (ctx.judges.length === 0) throw new GameError('INVALID_STATE', 'Football Auction requires a neutral judge');
-    const rounds: Round[] = ctx.players.map((p) => ({ opener: p, bid: 0, bidder: null, active: [...ctx.players], lastDropper: null, turn: p, bids: [], taps: [], challengeStart: null, outcome: null, judge: null }));
-    return startRound({ mode: 'auction', players: [...ctx.players], judges: [...ctx.judges], timing: ctx.timing, items: items.slice(0, rounds.length), rounds, r: 0, phase: 'BIDDING', phaseStart: now, phaseEnd: null, voided: [], overrides: {} }, 0, now);
+    if (ctx.judges.length === 0)
+      throw new GameError('INVALID_STATE', 'Football Auction requires a neutral judge');
+    const rounds: Round[] = ctx.players.map((p) => ({
+      opener: p,
+      bid: 0,
+      bidder: null,
+      active: [...ctx.players],
+      lastDropper: null,
+      turn: p,
+      bids: [],
+      taps: [],
+      challengeStart: null,
+      outcome: null,
+      judge: null,
+    }));
+    return startRound(
+      {
+        mode: 'auction',
+        players: [...ctx.players],
+        judges: [...ctx.judges],
+        timing: ctx.timing,
+        items: items.slice(0, rounds.length),
+        rounds,
+        r: 0,
+        phase: 'BIDDING',
+        phaseStart: now,
+        phaseEnd: null,
+        voided: [],
+        overrides: {},
+      },
+      0,
+      now,
+    );
   },
   act(s, actor, action, now) {
     if (s.phaseEnd !== null && now >= s.phaseEnd) throw new GameError('DEADLINE_PASSED', 'Time is up');
     const round = s.rounds[s.r]!;
     if (action.type === 'bid' || action.type === 'drop') {
       if (s.phase !== 'BIDDING') throw new GameError('INVALID_STATE', 'Bidding is closed');
-      if (actor.role !== 'PLAYER' || actor.memberId !== round.turn) throw new GameError('FORBIDDEN', 'Not your turn to bid');
+      if (actor.role !== 'PLAYER' || actor.memberId !== round.turn)
+        throw new GameError('FORBIDDEN', 'Not your turn to bid');
       return applyBid(s, actor.memberId, action.type === 'drop' ? 'DROP' : Number(action.amount), now, false);
     }
     if (action.type === 'tap' || action.type === 'undo') {
-      if (actor.role !== 'JUDGE' || !s.judges.includes(actor.memberId)) throw new GameError('FORBIDDEN', 'Only the judge can count');
-      if (s.phase !== 'AWAIT_JUDGE' && s.phase !== 'CHALLENGE') throw new GameError('INVALID_STATE', 'No challenge in progress');
+      if (actor.role !== 'JUDGE' || !s.judges.includes(actor.memberId))
+        throw new GameError('FORBIDDEN', 'Only the judge can count');
+      if (s.phase !== 'AWAIT_JUDGE' && s.phase !== 'CHALLENGE')
+        throw new GameError('INVALID_STATE', 'No challenge in progress');
       let n = s;
       if (s.phase === 'AWAIT_JUDGE') {
         if (action.type === 'undo') throw new GameError('INVALID_STATE', 'Nothing to undo');
         n = startChallenge(s, now); // 30s starts on the judge's first valid tap (approved)
       }
       const cur = n.rounds[n.r]!;
-      if (action.type === 'undo' && tapCount(cur) === 0) throw new GameError('INVALID_STATE', 'Nothing to undo');
+      if (action.type === 'undo' && tapCount(cur) === 0)
+        throw new GameError('INVALID_STATE', 'Nothing to undo');
       const name = typeof action.name === 'string' ? action.name.slice(0, 80) : undefined;
-      const taps = [...cur.taps, { delta: (action.type === 'tap' ? 1 : -1) as 1 | -1, at: now, judge: actor.memberId, ...(name ? { name } : {}) }];
+      const taps = [
+        ...cur.taps,
+        {
+          delta: (action.type === 'tap' ? 1 : -1) as 1 | -1,
+          at: now,
+          judge: actor.memberId,
+          ...(name ? { name } : {}),
+        },
+      ];
       n = patchRound(n, { taps, judge: actor.memberId });
       // Undo never resets the timer (approved). Success is immediate once the count reaches the bid.
       if (tapCount({ taps }) >= cur.bid) return finishRound(n, 'SUCCESS', now);
@@ -161,7 +239,8 @@ export const auctionEngine: Engine<AuctionState, AuctionItem> = {
     const round = s.rounds[s.r]!;
     if (s.phase === 'BIDDING') return applyBid(s, round.turn, round.bidder === null ? 1 : 'DROP', d, true);
     if (s.phase === 'AWAIT_JUDGE') return startChallenge(s, d); // PROPOSED auto-start
-    if (s.phase === 'CHALLENGE') return finishRound(s, tapCount(round) >= round.bid ? 'SUCCESS' : 'FAILURE', d);
+    if (s.phase === 'CHALLENGE')
+      return finishRound(s, tapCount(round) >= round.bid ? 'SUCCESS' : 'FAILURE', d);
     if (s.phase === 'ROUND_REVEAL') return startRound(s, s.r + 1, d);
     return s;
   },
@@ -177,10 +256,12 @@ export const auctionEngine: Engine<AuctionState, AuctionItem> = {
     return [{ itemIndex: s.r, closesAt: s.phaseEnd, eligible }];
   },
   adjudicate(s, adj) {
-    if (adj.decision === 'VOID') return s.voided.includes(adj.itemIndex) ? s : { ...s, voided: [...s.voided, adj.itemIndex] };
+    if (adj.decision === 'VOID')
+      return s.voided.includes(adj.itemIndex) ? s : { ...s, voided: [...s.voided, adj.itemIndex] };
     if (adj.decision === 'ACCEPT') {
       const round = s.rounds[adj.itemIndex]!;
-      const favour = adj.claimantId === round.bidder ? 'SUCCESS' : adj.claimantId === round.lastDropper ? 'FAILURE' : null;
+      const favour =
+        adj.claimantId === round.bidder ? 'SUCCESS' : adj.claimantId === round.lastDropper ? 'FAILURE' : null;
       if (!favour) throw new GameError('RULE_VIOLATION', 'Claimant not involved in this auction');
       return { ...s, overrides: { ...s.overrides, [String(adj.itemIndex)]: favour } };
     }
@@ -210,7 +291,10 @@ export const auctionEngine: Engine<AuctionState, AuctionItem> = {
       active: round.active,
       bids: round.bids.map((b) => ({ player: b.player, amount: b.amount, auto: b.auto })),
       count: tapCount(round),
-      namesCounted: isJudge || over ? round.taps.filter((t) => t.name).map((t) => ({ delta: t.delta, name: t.name })) : [],
+      namesCounted:
+        isJudge || over
+          ? round.taps.filter((t) => t.name).map((t) => ({ delta: t.delta, name: t.name }))
+          : [],
       // The answer universe is a judging aid only: judge always, others after the round.
       universe: isJudge || over ? item.universe.map((u) => u.label) : null,
       outcome: over ? outcomeOf(s, s.r) : null,

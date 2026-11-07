@@ -73,7 +73,16 @@ export type QuestionStatus =
   | 'RETIRED';
 
 export interface GateResult {
-  gate: 'EVIDENCE' | 'IDENTITY' | 'TRUTH' | 'DISTRACTORS' | 'CLUES' | 'NOVELTY' | 'DIFFICULTY' | 'LICENSING' | 'MODE_VALIDATOR';
+  gate:
+    | 'EVIDENCE'
+    | 'IDENTITY'
+    | 'TRUTH'
+    | 'DISTRACTORS'
+    | 'CLUES'
+    | 'NOVELTY'
+    | 'DIFFICULTY'
+    | 'LICENSING'
+    | 'MODE_VALIDATOR';
   passed: boolean;
   failureStatus: QuestionStatus | null;
   message: string;
@@ -84,7 +93,10 @@ export interface DifficultyInfo {
   estimate: number;
   tier: 'EASY' | 'MEDIUM' | 'HARD' | 'EXPERT';
   status: 'PROVISIONAL' | 'CALIBRATED';
-  components: Record<'rarity' | 'complexity' | 'distractorSimilarity' | 'temporalDistance' | 'recallDepth', number>;
+  components: Record<
+    'rarity' | 'complexity' | 'distractorSimilarity' | 'temporalDistance' | 'recallDepth',
+    number
+  >;
   attempts: number;
   correct: number;
   posteriorMean: number | null;

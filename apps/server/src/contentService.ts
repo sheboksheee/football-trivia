@@ -1,5 +1,16 @@
 import { createRng, MODES, type ContentItem, type McqItem, type ModeKey } from '@ft/shared';
-import { DEV_POLICY, fixtureSnapshots, generateLeague, runPipeline, SOURCES, STRICT_POLICY, type Question, type QuestionBank, type ReviewAction, type PipelineResult } from '@ft/content';
+import {
+  DEV_POLICY,
+  fixtureSnapshots,
+  generateLeague,
+  runPipeline,
+  SOURCES,
+  STRICT_POLICY,
+  type Question,
+  type QuestionBank,
+  type ReviewAction,
+  type PipelineResult,
+} from '@ft/content';
 import { engineFor } from '@ft/game-rules';
 import type { Persistence } from './persistence.js';
 import type { Logger } from './logger.js';
@@ -30,11 +41,19 @@ export class ContentService {
     await this.db.saveSources(SOURCES);
     if (this.db.kind === 'postgres') await this.db.saveSnapshots(fixtureSnapshots(generateLeague()));
     await this.db.saveQuestions(this.bank.all().filter((q) => !stored.has(q.id)));
-    this.log.info({ ms: Date.now() - t, counts: this.bank.counts(), conflicts: this.result.conflicts.length, restored }, 'content bank ready');
+    this.log.info(
+      { ms: Date.now() - t, counts: this.bank.counts(), conflicts: this.result.conflicts.length, restored },
+      'content bank ready',
+    );
   }
 
   /** Pins content for a whole Match Night at start (no mid-match drift), no repeats within the room. */
-  drawForMatch(modes: ModeKey[], playerCount: number, seed: number, used: Set<string>): { content: ContentItem[][]; tiebreak: McqItem[] } {
+  drawForMatch(
+    modes: ModeKey[],
+    playerCount: number,
+    seed: number,
+    used: Set<string>,
+  ): { content: ContentItem[][]; tiebreak: McqItem[] } {
     const rng = createRng(seed);
     const content = modes.map((k) => {
       const engine = engineFor(k);

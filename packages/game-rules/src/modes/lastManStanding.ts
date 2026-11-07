@@ -16,7 +16,8 @@ type S = SimState<McqItem, McqAnswer, LmsExtra>;
 
 export function parseMcq(item: McqItem, action: Record<string, unknown>, now: number): McqAnswer {
   const id = action.optionId;
-  if (typeof id !== 'string' || !item.options.some((o) => o.id === id)) throw new GameError('INVALID_MESSAGE', 'Unknown option');
+  if (typeof id !== 'string' || !item.options.some((o) => o.id === id))
+    throw new GameError('INVALID_MESSAGE', 'Unknown option');
   return { at: now, optionId: id };
 }
 
@@ -35,8 +36,13 @@ export function viewMcq(item: McqItem, revealed: boolean) {
  * elimination. Equal keys share a place. Native score = averaged placement share (5/3/1/0),
  * plus +1 perfect survival (alive with all hearts).
  */
-export function lmsRankingGroups(players: string[], hearts: Record<string, number>, eliminatedAt: Record<string, number>): string[][] {
-  const key = (m: string) => [hearts[m]! > 0 ? 1 : 0, hearts[m]!, eliminatedAt[m] ?? Number.MAX_SAFE_INTEGER] as const;
+export function lmsRankingGroups(
+  players: string[],
+  hearts: Record<string, number>,
+  eliminatedAt: Record<string, number>,
+): string[][] {
+  const key = (m: string) =>
+    [hearts[m]! > 0 ? 1 : 0, hearts[m]!, eliminatedAt[m] ?? Number.MAX_SAFE_INTEGER] as const;
   const cmp = (a: string, b: string) => {
     const ka = key(a);
     const kb = key(b);

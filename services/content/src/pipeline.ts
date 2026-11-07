@@ -29,7 +29,10 @@ export interface PipelineResult {
  * Never generates and publishes unsupported content: auto-publication requires every gate to
  * pass AND every source to be an eligible fixture under the active policy.
  */
-export function runPipeline(policy: PublishPolicy = DEV_POLICY, at = '2026-11-01T00:00:00.000Z'): PipelineResult {
+export function runPipeline(
+  policy: PublishPolicy = DEV_POLICY,
+  at = '2026-11-01T00:00:00.000Z',
+): PipelineResult {
   const league = generateLeague();
   const snaps = fixtureSnapshots(league, at);
   const kb = normalize(snaps);
@@ -40,7 +43,9 @@ export function runPipeline(policy: PublishPolicy = DEV_POLICY, at = '2026-11-01
   candidates.forEach((c, i) => {
     const gates = runGates(c, kb, seen);
     seen.add(c.fingerprint);
-    const sourceIds = [...new Set(c.factIds.map((id) => kb.factIndex.get(id)?.sourceId).filter((x): x is string => !!x))];
+    const sourceIds = [
+      ...new Set(c.factIds.map((id) => kb.factIndex.get(id)?.sourceId).filter((x): x is string => !!x)),
+    ];
     const difficulty = estimateDifficulty(c.components);
     const failure = primaryFailure(gates);
     const highImpact = HIGH_IMPACT_KINDS.includes(c.kind);
@@ -55,13 +60,40 @@ export function runPipeline(policy: PublishPolicy = DEV_POLICY, at = '2026-11-01
     const attribution = sourceIds.map((s) => sourceById(s)?.attribution ?? s).join('; ');
     const item = {
       ...c.item,
-      meta: { questionId: id, version: 1, difficulty: difficulty.tier, difficultyStatus: difficulty.status, attribution, sourceIds, evidenceIds: [...new Set(c.factIds.map((f) => kb.factIndex.get(f)?.evidenceId ?? ''))].slice(0, 50) },
+      meta: {
+        questionId: id,
+        version: 1,
+        difficulty: difficulty.tier,
+        difficultyStatus: difficulty.status,
+        attribution,
+        sourceIds,
+        evidenceIds: [...new Set(c.factIds.map((f) => kb.factIndex.get(f)?.evidenceId ?? ''))].slice(0, 50),
+      },
     } as ContentItem;
     questions.push({
-      id, kind: c.kind, modes: KIND_TO_MODES[c.kind], version: 1, status, template: c.template, item,
-      factIds: c.factIds, sourceIds, fingerprint: c.fingerprint, highImpact, gates, difficulty, createdAt: at,
+      id,
+      kind: c.kind,
+      modes: KIND_TO_MODES[c.kind],
+      version: 1,
+      status,
+      template: c.template,
+      item,
+      factIds: c.factIds,
+      sourceIds,
+      fingerprint: c.fingerprint,
+      highImpact,
+      gates,
+      difficulty,
+      createdAt: at,
       audit: [
-        { at, actor: 'pipeline', action: 'generated', fromStatus: null, toStatus: 'CANDIDATE', note: c.template },
+        {
+          at,
+          actor: 'pipeline',
+          action: 'generated',
+          fromStatus: null,
+          toStatus: 'CANDIDATE',
+          note: c.template,
+        },
         { at, actor: 'pipeline', action: 'gated', fromStatus: 'CANDIDATE', toStatus: status, note },
       ],
     });

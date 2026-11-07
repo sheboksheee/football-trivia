@@ -19,7 +19,12 @@ export const DisplayName = z
 
 export const ModeKeySchema = z.enum(MODE_KEYS);
 
-export const AppealReason = z.enum(['ANSWER_SHOULD_BE_ACCEPTED', 'QUESTION_INCORRECT', 'QUESTION_AMBIGUOUS', 'TECHNICAL_ISSUE']);
+export const AppealReason = z.enum([
+  'ANSWER_SHOULD_BE_ACCEPTED',
+  'QUESTION_INCORRECT',
+  'QUESTION_AMBIGUOUS',
+  'TECHNICAL_ISSUE',
+]);
 export type AppealReason = z.infer<typeof AppealReason>;
 
 export const AppealDecision = z.enum(['ACCEPT', 'REJECT', 'VOID']);
@@ -55,7 +60,11 @@ export const ClientCommand = z.discriminatedUnion('type', [
   cmd('game.action', z.object({ action: z.record(z.string(), z.unknown()) })),
   cmd(
     'appeal.open',
-    z.object({ questionIndex: z.number().int().min(0).max(1000), reason: AppealReason, note: z.string().max(280).optional() }),
+    z.object({
+      questionIndex: z.number().int().min(0).max(1000),
+      reason: AppealReason,
+      note: z.string().max(280).optional(),
+    }),
   ),
   cmd(
     'appeal.resolve',
@@ -120,7 +129,8 @@ export interface KickedMessage {
   reason: string;
 }
 
-export type ServerMessage = AckMessage | WelcomeMessage | StateMessage | KickedMessage | { t: 'pong'; serverNow: number };
+export type ServerMessage =
+  AckMessage | WelcomeMessage | StateMessage | KickedMessage | { t: 'pong'; serverNow: number };
 
 export class GameError extends Error {
   constructor(

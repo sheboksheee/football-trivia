@@ -1,4 +1,11 @@
-import { createRng, GameError, matchesAlias, shuffle, type AppealDecision, type ImpostorItem } from '@ft/shared';
+import {
+  createRng,
+  GameError,
+  matchesAlias,
+  shuffle,
+  type AppealDecision,
+  type ImpostorItem,
+} from '@ft/shared';
 import type { Engine } from '../types.js';
 import type { Timing } from '../timing.js';
 import { groupByScore } from '../ranking.js';
@@ -49,7 +56,8 @@ export function roundPoints(s: ImpostorState, r: number): Record<string, number>
   const out: Record<string, number> = {};
   if (s.voided.includes(r)) return out;
   const round = s.rounds[r]!;
-  for (const [voter, target] of Object.entries(round.votes)) if (voter !== round.impostor && target === round.impostor) out[voter] = IMPOSTOR_POINTS.vote;
+  for (const [voter, target] of Object.entries(round.votes))
+    if (voter !== round.impostor && target === round.impostor) out[voter] = IMPOSTOR_POINTS.vote;
   if (!isCaught(round.votes, round.impostor)) out[round.impostor] = IMPOSTOR_POINTS.escape;
   else if (guessCorrect(s, r)) out[round.impostor] = IMPOSTOR_POINTS.caughtGuessed;
   return out;
@@ -61,7 +69,8 @@ function settledUpTo(s: ImpostorState) {
 
 function scores(s: ImpostorState): Record<string, string> {
   const out: Record<string, number> = Object.fromEntries(s.players.map((p) => [p, 0]));
-  for (let r = 0; r < settledUpTo(s); r++) for (const [m, p] of Object.entries(roundPoints(s, r))) out[m] = (out[m] ?? 0) + p;
+  for (let r = 0; r < settledUpTo(s); r++)
+    for (const [m, p] of Object.entries(roundPoints(s, r))) out[m] = (out[m] ?? 0) + p;
   return Object.fromEntries(Object.entries(out).map(([k, v]) => [k, String(v)]));
 }
 
@@ -81,7 +90,9 @@ function startRound(s: ImpostorState, r: number, at: number): ImpostorState {
 
 function afterVote(s: ImpostorState, at: number): ImpostorState {
   const round = s.rounds[s.r]!;
-  return isCaught(round.votes, round.impostor) ? to(s, 'GUESS', at, s.timing.impostorGuess) : to(s, 'ROUND_REVEAL', at, s.timing.appealWindow);
+  return isCaught(round.votes, round.impostor)
+    ? to(s, 'GUESS', at, s.timing.impostorGuess)
+    : to(s, 'ROUND_REVEAL', at, s.timing.appealWindow);
 }
 
 export const impostorEngine: Engine<ImpostorState, ImpostorItem> = {
@@ -93,17 +104,32 @@ export const impostorEngine: Engine<ImpostorState, ImpostorItem> = {
     if (ctx.players.length < 3) throw new GameError('INVALID_STATE', 'The Impostor needs at least 3 players');
     const order = shuffle(ctx.players, createRng(ctx.seed));
     const rounds = order.map((impostor) => ({ impostor, votes: {}, guess: null }));
-    const s: ImpostorState = { mode: 'impostor', players: [...ctx.players], timing: ctx.timing, items: items.slice(0, rounds.length), rounds, r: 0, phase: 'REVEAL', clueStep: 0, phaseStart: now, phaseEnd: null, voided: [], regraded: [] };
+    const s: ImpostorState = {
+      mode: 'impostor',
+      players: [...ctx.players],
+      timing: ctx.timing,
+      items: items.slice(0, rounds.length),
+      rounds,
+      r: 0,
+      phase: 'REVEAL',
+      clueStep: 0,
+      phaseStart: now,
+      phaseEnd: null,
+      voided: [],
+      regraded: [],
+    };
     return startRound(s, 0, now);
   },
   act(s, actor, action, now) {
-    if (actor.role !== 'PLAYER' || !s.players.includes(actor.memberId)) throw new GameError('FORBIDDEN', 'Only players can act');
+    if (actor.role !== 'PLAYER' || !s.players.includes(actor.memberId))
+      throw new GameError('FORBIDDEN', 'Only players can act');
     if (s.phaseEnd !== null && now >= s.phaseEnd) throw new GameError('DEADLINE_PASSED', 'Time is up');
     const round = s.rounds[s.r]!;
     if (action.type === 'vote') {
       if (s.phase !== 'VOTE') throw new GameError('INVALID_STATE', 'Voting is not open');
       const target = action.target;
-      if (typeof target !== 'string' || !s.players.includes(target)) throw new GameError('INVALID_MESSAGE', 'Unknown player');
+      if (typeof target !== 'string' || !s.players.includes(target))
+        throw new GameError('INVALID_MESSAGE', 'Unknown player');
       if (target === actor.memberId) throw new GameError('RULE_VIOLATION', 'You cannot vote for yourself');
       if (round.votes[actor.memberId]) throw new GameError('DUPLICATE', 'Vote already cast');
       const rounds = [...s.rounds];
@@ -113,7 +139,8 @@ export const impostorEngine: Engine<ImpostorState, ImpostorItem> = {
     }
     if (action.type === 'guess') {
       if (s.phase !== 'GUESS') throw new GameError('INVALID_STATE', 'No guess expected');
-      if (actor.memberId !== round.impostor) throw new GameError('FORBIDDEN', 'Only the caught impostor guesses');
+      if (actor.memberId !== round.impostor)
+        throw new GameError('FORBIDDEN', 'Only the caught impostor guesses');
       const text = typeof action.text === 'string' ? action.text.trim() : '';
       if (!text || text.length > 80) throw new GameError('INVALID_MESSAGE', 'Guess must be 1–80 characters');
       const rounds = [...s.rounds];
@@ -122,7 +149,8 @@ export const impostorEngine: Engine<ImpostorState, ImpostorItem> = {
     }
     if (action.type === 'clueDone') {
       // The current clue-giver may finish early.
-      if (s.phase !== 'CLUES' || clueOrder(s)[s.clueStep % s.players.length] !== actor.memberId) throw new GameError('INVALID_STATE', 'Not your clue turn');
+      if (s.phase !== 'CLUES' || clueOrder(s)[s.clueStep % s.players.length] !== actor.memberId)
+        throw new GameError('INVALID_STATE', 'Not your clue turn');
       return impostorEngine.step(s, now);
     }
     throw new GameError('INVALID_MESSAGE', 'Unknown action');
@@ -133,7 +161,8 @@ export const impostorEngine: Engine<ImpostorState, ImpostorItem> = {
         return { ...to(s, 'CLUES', d, s.timing.impostorClue), clueStep: 0 };
       case 'CLUES': {
         const next = s.clueStep + 1;
-        if (next >= s.players.length * IMPOSTOR_CLUE_CYCLES) return to(s, 'DISCUSSION', d, s.timing.impostorDiscussion);
+        if (next >= s.players.length * IMPOSTOR_CLUE_CYCLES)
+          return to(s, 'DISCUSSION', d, s.timing.impostorDiscussion);
         return { ...to(s, 'CLUES', d, s.timing.impostorClue), clueStep: next };
       }
       case 'DISCUSSION':
@@ -158,10 +187,12 @@ export const impostorEngine: Engine<ImpostorState, ImpostorItem> = {
     return [{ itemIndex: s.r, closesAt: s.phaseEnd, eligible: [...s.players] }];
   },
   adjudicate(s, adj) {
-    if (adj.decision === 'VOID' && !s.voided.includes(adj.itemIndex)) return { ...s, voided: [...s.voided, adj.itemIndex] };
+    if (adj.decision === 'VOID' && !s.voided.includes(adj.itemIndex))
+      return { ...s, voided: [...s.voided, adj.itemIndex] };
     if (adj.decision === 'ACCEPT') {
       const round = s.rounds[adj.itemIndex]!;
-      if (adj.claimantId !== round.impostor || round.guess === null) throw new GameError('RULE_VIOLATION', 'Only the impostor’s guess can be accepted');
+      if (adj.claimantId !== round.impostor || round.guess === null)
+        throw new GameError('RULE_VIOLATION', 'Only the impostor’s guess can be accepted');
       if (!s.regraded.includes(adj.itemIndex)) return { ...s, regraded: [...s.regraded, adj.itemIndex] };
     }
     return s;

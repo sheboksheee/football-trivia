@@ -6,7 +6,8 @@ export interface HlAnswer extends SimAnswer {
 }
 
 export function correctChoice(item: HigherLowerItem): 'HIGHER' | 'LOWER' {
-  if (item.a.value === item.b.value) throw new Error('Higher or Lower item has equal values (validator should reject)');
+  if (item.a.value === item.b.value)
+    throw new Error('Higher or Lower item has equal values (validator should reject)');
   return item.b.value > item.a.value ? 'HIGHER' : 'LOWER';
 }
 
@@ -32,7 +33,8 @@ export const higherLowerEngine = makeSimultaneousEngine<HigherLowerItem, HlAnswe
   questionMs: (t) => t.higherLowerQuestion,
   initExtra: () => null,
   parseAnswer(_s, _item, _m, action, now) {
-    if (action.choice !== 'HIGHER' && action.choice !== 'LOWER') throw new GameError('INVALID_MESSAGE', 'choice must be HIGHER or LOWER');
+    if (action.choice !== 'HIGHER' && action.choice !== 'LOWER')
+      throw new GameError('INVALID_MESSAGE', 'choice must be HIGHER or LOWER');
     return { at: now, choice: action.choice };
   },
   grade: (item, ans) => ans !== undefined && ans.choice === correctChoice(item),

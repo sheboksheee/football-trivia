@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "tsx watch src/main.ts",
     "start": "node dist/main.js",
-    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/main.js --packages=external --sourcemap && esbuild src/migrate.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/migrate.js --packages=external",
+    "build": "esbuild src/main.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/main.js --external:pg --external:pino --external:ws --external:zod --sourcemap && esbuild src/migrate.ts --bundle --platform=node --format=esm --target=node22 --outfile=dist/migrate.js --external:pg --external:pino --external:ws --external:zod",
     "typecheck": "tsc -p tsconfig.json",
     "db:migrate": "tsx src/migrate.ts"
   },
