@@ -59,9 +59,9 @@ export function Room({ code, go }: { code: string; go: (r: string) => void }) {
     return (
       <div className="stack" style={{ maxWidth: 480, margin: '0 auto' }}>
         {err && <Banner tone="warn">{err}</Banner>}
-        <Banner>You’re not in room {code} on this device yet.</Banner>
+        <Banner>{t('notInRoom', { code })}</Banner>
         <button className="btn primary" onClick={() => go(`#/join/${code}`)}>
-          {t('join')} {code}
+          {t('joinCode', { code })}
         </button>
       </div>
     );
@@ -69,7 +69,7 @@ export function Room({ code, go }: { code: string; go: (r: string) => void }) {
   if (state === 'error') {
     return (
       <div className="stack" style={{ maxWidth: 480, margin: '0 auto' }}>
-        <Banner tone="bad">Cannot reach the game server.</Banner>
+        <Banner tone="bad">{t('serverDown')}</Banner>
         <button className="btn" onClick={() => location.reload()}>
           {t('tryAgain')}
         </button>
@@ -79,7 +79,7 @@ export function Room({ code, go }: { code: string; go: (r: string) => void }) {
   const view = snap.view;
   if (!view) {
     return (
-      <div className="stack" aria-busy="true" aria-label="Loading room">
+      <div className="stack" aria-busy="true" aria-label={t('loadingRoom')}>
         <Skeleton h={120} />
         <Skeleton h={60} />
         <Skeleton h={60} />
@@ -92,11 +92,7 @@ export function Room({ code, go }: { code: string; go: (r: string) => void }) {
     (view.room.status === 'SUSPENDED' && !view.matchNight);
   return (
     <div className="stack">
-      {snap.status !== 'online' && (
-        <Banner tone="warn">
-          {t('reconnecting')} Your seat is held for 30 seconds; answer timers do not pause for disconnects.
-        </Banner>
-      )}
+      {snap.status !== 'online' && <Banner tone="warn">{t('reconnectingSeat')}</Banner>}
       {inLobby ? <Lobby view={view} /> : <Game view={view} />}
       {view.room.status !== 'COMPLETED' && (
         <div className="row">
@@ -104,13 +100,7 @@ export function Room({ code, go }: { code: string; go: (r: string) => void }) {
           <button
             className="btn ghost sm"
             onClick={async () => {
-              if (
-                confirm(
-                  view.matchNight
-                    ? 'Leave during play? You forfeit future modes but keep completed-mode points.'
-                    : 'Leave this room?',
-                )
-              ) {
+              if (confirm(view.matchNight ? t('leaveConfirmGame') : t('leaveConfirmLobby'))) {
                 await client.leave();
                 go('#/');
               }

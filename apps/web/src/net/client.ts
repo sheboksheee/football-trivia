@@ -12,6 +12,7 @@ export interface Snapshot {
   roomCode: string | null;
   kicked: string | null;
   lastError: string | null;
+  lastErrorCode: string | null;
 }
 
 interface Session {
@@ -58,6 +59,7 @@ export class GameClient {
     roomCode: null,
     kicked: null,
     lastError: null,
+    lastErrorCode: null,
   };
 
   constructor(private readonly url = defaultUrl()) {}
@@ -85,7 +87,7 @@ export class GameClient {
     this.ws = ws;
     ws.onopen = () => {
       this.retry = 0;
-      this.set({ status: 'online', lastError: null });
+      this.set({ status: 'online', lastError: null, lastErrorCode: null });
       if (this.session && this.snap.roomCode) void this.resume();
     };
     ws.onmessage = (ev) => this.onMessage(JSON.parse(String(ev.data)) as ServerMessage);
@@ -122,7 +124,7 @@ export class GameClient {
         this.pending.delete(m.id);
         p.ok(m);
       }
-      if (!m.ok && m.error) this.set({ lastError: m.error.message });
+      if (!m.ok && m.error) this.set({ lastError: m.error.message, lastErrorCode: m.error.code });
     } else if (m.t === 'welcome') {
       this.session = { code: m.roomCode, memberId: m.memberId, token: m.resumeToken };
       saveSession(this.session);
@@ -193,7 +195,7 @@ export class GameClient {
     this.set({ kicked: null });
   }
   clearError() {
-    this.set({ lastError: null });
+    this.set({ lastError: null, lastErrorCode: null });
   }
 }
 

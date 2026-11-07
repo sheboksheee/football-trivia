@@ -8,12 +8,12 @@ pnpm install
 pnpm typecheck          # strict TS, 0 errors
 pnpm lint               # eslint, 0 problems
 pnpm format:check       # prettier
-TEST_DATABASE_URL=postgresql://ft:ft@localhost:5432/football_trivia_test pnpm test   # 115 tests, 10 files
+TEST_DATABASE_URL=postgresql://ft:ft@localhost:5432/football_trivia_test pnpm test   # 117 tests, 11 files
 pnpm build              # web PWA + bundled server
-pnpm test:e2e           # Playwright, 5 browser tests (starts its own server)
+pnpm test:e2e           # Playwright, 6 browser tests (incl. a full Arabic game on phone + laptop) (starts its own server)
 FT_URL=ws://localhost:8787/ws SPECTATORS=300 pnpm --filter @ft/load test   # against a running server
 ```
-Without `TEST_DATABASE_URL` the 2 PostgreSQL tests are skipped (113 run).
+Without `TEST_DATABASE_URL` the 2 PostgreSQL tests are skipped (115 run).
 
 ## Phase checklist
 | Phase | State | Evidence |
@@ -49,7 +49,7 @@ Without `TEST_DATABASE_URL` the 2 PostgreSQL tests are skipped (113 run).
 ## Known limitations / next engineering tasks
 - Single server process owns rooms (no horizontal scaling yet); in-memory apply then async Postgres append.
 - Content Studio has no editing of question wording (review actions only) and no exposure/calibration dashboards.
-- Mode screens' in-game copy is English; only the shell is translated to Arabic.
+- UI is fully Egyptian-Arabic by default (English toggle); the questions themselves are still English (fictional dataset) — Arabic question templates are next.
 - No in-game kick UI (lobby kick is a server command without UI), no chat/mute/report.
 - Spectator feed delay (anti-coaching) not implemented.
 - Capacitor packaging not started (later verified release task per START_HERE).

@@ -100,7 +100,13 @@ describe('room lifecycle', () => {
 
   it('cannot start with 1 player, unready players, blocked modes or missing judge', () => {
     const r = new Sim();
-    expect(r.view('h').startIssues.join()).toMatch(/at least 2/);
+    expect(
+      r
+        .view('h')
+        .startIssues.map((i) => i.message)
+        .join(),
+    ).toMatch(/at least 2/);
+    expect(r.view('h').startIssues.map((i) => i.code)).toContain('TOO_FEW_PLAYERS');
     r.join('b');
     expect(r.try(() => r.configure(['who_am_i']))).toMatch(/not playable/);
     expect(
@@ -109,9 +115,19 @@ describe('room lifecycle', () => {
       ),
     ).toMatch(/exactly 12/);
     r.configure(['buzzer']);
-    expect(r.view('h').startIssues.join()).toMatch(/neutral judge/);
+    expect(
+      r
+        .view('h')
+        .startIssues.map((i) => i.message)
+        .join(),
+    ).toMatch(/neutral judge/);
     r.configure(['impostor']);
-    expect(r.view('h').startIssues.join()).toMatch(/3\+ players/);
+    expect(
+      r
+        .view('h')
+        .startIssues.map((i) => i.message)
+        .join(),
+    ).toMatch(/3\+ players/);
     r.configure(['higher_lower']);
     expect(r.try(() => r.start([HL]))).toMatch(/Waiting for/);
     expect(

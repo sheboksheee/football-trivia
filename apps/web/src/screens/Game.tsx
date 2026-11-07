@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { MODES, type AppealReason, type ModeKey } from '@ft/shared';
 import type { RoomView } from '@ft/game-rules';
 import { useI18n } from '../i18n.js';
+import { modeCopy, modeName } from '../modeText.js';
 import { client } from '../net/client.js';
 import { useGame, useRemaining } from '../net/hooks.js';
 import { ModeView } from '../modes/ModeViews.js';
@@ -9,38 +10,37 @@ import { Avatar, Banner, formatPoints, memberNames, Modal, Timer } from '../ui/c
 
 type MN = NonNullable<RoomView['matchNight']>;
 
-const REASONS: Array<{ key: AppealReason; label: string }> = [
-  { key: 'ANSWER_SHOULD_BE_ACCEPTED', label: 'My answer should be accepted' },
-  { key: 'QUESTION_INCORRECT', label: 'The question or answer is wrong' },
-  { key: 'QUESTION_AMBIGUOUS', label: 'The question is ambiguous' },
-  { key: 'TECHNICAL_ISSUE', label: 'Technical problem' },
+const REASONS: AppealReason[] = [
+  'ANSWER_SHOULD_BE_ACCEPTED',
+  'QUESTION_INCORRECT',
+  'QUESTION_AMBIGUOUS',
+  'TECHNICAL_ISSUE',
 ];
 
 export function Game({ view }: { view: RoomView }) {
+  const { t, locale } = useI18n();
   const mn = view.matchNight!;
   const me = view.me;
   const role = me?.role ?? 'SPECTATOR';
   const runKey = mn.runKey;
-  const modeName =
-    runKey === 'tiebreak' ? 'Championship tie-break' : runKey ? MODES[runKey as ModeKey].name.en : '';
   return (
     <div className="stack">
       <div className="row">
         <span className="eyebrow">
-          Match Night ·{' '}
+          {t('matchNight')} ·{' '}
           {mn.phase === 'TIEBREAK' || mn.phase === 'FINAL'
-            ? 'Final'
-            : `Mode ${mn.index + 1} of ${mn.modes.length}`}
+            ? t('final')
+            : t('modeOf', { i: mn.index + 1, n: mn.modes.length })}
         </span>
         <span className="spacer" />
-        {role === 'SPECTATOR' && <span className="badge">👁 Spectating</span>}
-        {role === 'JUDGE' && <span className="badge info">⚖ Judge</span>}
-        {me?.forfeited && <span className="badge bad">Forfeited</span>}
+        {role === 'SPECTATOR' && <span className="badge">👁 {t('spectatingBadge')}</span>}
+        {role === 'JUDGE' && <span className="badge info">⚖ {t('judgeBadge')}</span>}
+        {me?.forfeited && <span className="badge bad">{t('forfeited')}</span>}
       </div>
       <ClockBanners view={view} />
       {me?.isHost && mn.phase !== 'FINAL' && <HostControls view={view} />}
-      <div className="grid-2">
-        <section className="card" aria-label={modeName}>
+      <div className="game-grid">
+        <section className="card stage-card" aria-label={runKey ? modeName(runKey, locale) : ''}>
           {mn.phase === 'INTRO' && runKey && runKey !== 'tiebreak' && (
             <Intro mn={mn} isHost={!!me?.isHost} frozen={view.clock.frozen} />
           )}
@@ -59,7 +59,7 @@ export function Game({ view }: { view: RoomView }) {
           {mn.phase === 'RESULTS' && <ModeResults mn={mn} isHost={!!me?.isHost} frozen={view.clock.frozen} />}
           {mn.phase === 'FINAL' && <Final mn={mn} />}
         </section>
-        <aside className="stack">
+        <aside className="stack side">
           <Appeals view={view} />
           <Standings mn={mn} />
         </aside>
@@ -75,21 +75,21 @@ function ClockBanners({ view }: { view: RoomView }) {
   if (view.room.status === 'SUSPENDED')
     out.push(
       <Banner key="s" tone="bad">
-        Room suspended: no eligible host is connected. It resumes when a player returns.
+        {t('suspended')}
       </Banner>,
     );
   if (view.pause)
     out.push(
       <Banner key="p" tone="warn" icon="⏸">
-        {t('paused')}
-        {view.pause.emergency ? ` — emergency: ${view.pause.reason}` : ' between questions'}. Timers are
-        frozen; nothing is revealed while paused.
+        {view.pause.emergency
+          ? t('pausedEmergency', { reason: view.pause.reason ?? '' })
+          : t('pausedBetween')}
       </Banner>,
     );
   else if (view.clock.reasons.includes('APPEAL'))
     out.push(
       <Banner key="a" tone="warn" icon="⚖">
-        {t('holdAppeal')}. Timers are frozen.
+        {t('holdAppeal')}
       </Banner>,
     );
   if (view.pausePending)
@@ -101,7 +101,7 @@ function ClockBanners({ view }: { view: RoomView }) {
   if (view.room.hostGraceUntil)
     out.push(
       <Banner key="h" tone="warn">
-        Host disconnected — {names[view.room.hostId]} has 30s to return before host transfers.
+        {t('hostAway', { name: names[view.room.hostId] ?? '' })}
       </Banner>,
     );
   return <>{out}</>;
@@ -114,7 +114,7 @@ function HostControls({ view }: { view: RoomView }) {
   const mn = view.matchNight!;
   const paused = !!view.pause;
   return (
-    <div className="row">
+    <div className="row host-bar">
       <span className="eyebrow">{t('host')}</span>
       {!paused && !view.pausePending && (
         <button
@@ -131,12 +131,12 @@ function HostControls({ view }: { view: RoomView }) {
       )}
       {(paused || view.pausePending) && (
         <button className="btn sm primary" onClick={() => client.send({ type: 'room.resume', payload: {} })}>
-          ▶ {paused ? t('resume') : t('cancel')}
+          {paused ? t('resume') : t('cancel')}
         </button>
       )}
       {(mn.phase === 'INTRO' || mn.phase === 'RESULTS') && !paused && (
         <button className="btn sm" onClick={() => client.send({ type: 'room.nextMode', payload: {} })}>
-          {t('skip')} →
+          {t('skip')}
         </button>
       )}
       {emergency && (
@@ -153,8 +153,7 @@ function HostControls({ view }: { view: RoomView }) {
             }}
           >
             <p className="muted" style={{ margin: 0 }}>
-              Freezes all timers immediately. The reason, time and your name are logged in the room audit
-              trail.
+              {t('emergencyHelp')}
             </p>
             <div className="field">
               <label className="label" htmlFor="reason">
@@ -163,6 +162,7 @@ function HostControls({ view }: { view: RoomView }) {
               <input
                 id="reason"
                 className="input"
+                dir="auto"
                 value={reason}
                 minLength={3}
                 maxLength={200}
@@ -187,27 +187,29 @@ function HostControls({ view }: { view: RoomView }) {
 }
 
 function Intro({ mn, isHost, frozen }: { mn: MN; isHost: boolean; frozen: boolean }) {
+  const { t, locale } = useI18n();
   const key = mn.runKey as ModeKey;
   const m = MODES[key];
-  const names = memberNames(useGameView());
+  const copy = modeCopy(key, locale);
+  const names = memberNames(useGame().view);
   const rem = useRemaining(mn.phaseEnd);
   return (
     <div className="stage">
-      <div className="eyebrow">Up next · mode {m.number}</div>
-      <h2 className="display h2">{m.name.en}</h2>
-      <p style={{ margin: 0 }}>{m.concept}</p>
+      <div className="eyebrow">{t('upNext', { n: m.number })}</div>
+      <h2 className="display h2">{copy.name}</h2>
+      <p style={{ margin: 0 }}>{copy.concept}</p>
       <div className="card tight" style={{ background: 'var(--bg-2)' }}>
         <div className="eyebrow" style={{ marginBottom: 6 }}>
-          Rules & scoring
+          {t('rulesScoring')}
         </div>
-        <p style={{ margin: 0 }}>{m.rules}</p>
-        {m.proposed.length > 0 && (
+        <p style={{ margin: 0 }}>{copy.rules}</p>
+        {copy.proposed.length > 0 && (
           <details style={{ marginTop: 8 }}>
             <summary className="small">
-              <span className="badge warn">Provisional</span> parameters proposed by the build team
+              <span className="badge warn">{t('provisional')}</span> {t('provisionalParams')}
             </summary>
             <ul className="small muted">
-              {m.proposed.map((p) => (
+              {copy.proposed.map((p) => (
                 <li key={p}>{p}</li>
               ))}
             </ul>
@@ -222,39 +224,30 @@ function Intro({ mn, isHost, frozen }: { mn: MN; isHost: boolean; frozen: boolea
           </span>
         ))}
       </div>
-      <Timer
-        end={mn.phaseEnd}
-        start={mn.phaseEnd !== null ? mn.phaseEnd - 10_000 : null}
-        label="Starting in"
-      />
+      <Timer end={mn.phaseEnd} start={mn.phaseEnd !== null ? mn.phaseEnd - 10_000 : null} />
       {!isHost && (
         <p className="small muted" style={{ margin: 0 }}>
-          {frozen ? 'Paused' : `Starting in ${Math.ceil((rem ?? 0) / 1000)}s`}
+          {frozen ? t('pausedShort') : t('startingIn', { s: Math.ceil((rem ?? 0) / 1000) })}
         </p>
       )}
     </div>
   );
 }
 
-function useGameView() {
-  return useGame().view;
-}
-
 function TiebreakHead({ mn }: { mn: MN }) {
-  const names = memberNames(useGameView());
+  const { t } = useI18n();
+  const names = memberNames(useGame().view);
   return (
     <Banner tone="warn" icon="🏆">
-      Tied on placement points and sole 1st/2nd/3rd finishes:{' '}
-      {(mn.tiebreakTied ?? []).map((m) => names[m]).join(', ')}. Up to five simultaneous questions; correct
-      beats wrong; still tied after five = shared champions.
+      {t('tiebreakIntro', { names: (mn.tiebreakTied ?? []).map((m) => names[m]).join('، ') })}
     </Banner>
   );
 }
 
 function ModeResults({ mn, isHost, frozen }: { mn: MN; isHost: boolean; frozen: boolean }) {
   const r = mn.results[mn.results.length - 1];
-  const names = memberNames(useGameView());
-  const { t } = useI18n();
+  const names = memberNames(useGame().view);
+  const { t, locale } = useI18n();
   if (!r) return null;
   const pos: Record<string, number> = {};
   let p = 0;
@@ -265,15 +258,15 @@ function ModeResults({ mn, isHost, frozen }: { mn: MN; isHost: boolean; frozen: 
   return (
     <div className="stage">
       <div className="eyebrow">{t('results')}</div>
-      <h2 className="display h2">{MODES[r.key].name.en}</h2>
+      <h2 className="display h2">{modeName(r.key, locale)}</h2>
       <div className="table-wrap">
         <table className="table">
           <thead>
             <tr>
-              <th>#</th>
-              <th>Player</th>
+              <th>{t('rank')}</th>
+              <th>{t('player_col')}</th>
               <th>{t('native')}</th>
-              <th>Match Night</th>
+              <th>{t('matchNightPts')}</th>
             </tr>
           </thead>
           <tbody>
@@ -289,30 +282,33 @@ function ModeResults({ mn, isHost, frozen }: { mn: MN; isHost: boolean; frozen: 
                     {names[m]}
                   </span>
                 </td>
-                <td className="num">{formatPoints(r.scores[m])}</td>
-                <td className="num accent">+{formatPoints(r.placement[m])}</td>
+                <td className="num" dir="ltr">
+                  {formatPoints(r.scores[m])}
+                </td>
+                <td className="num accent" dir="ltr">
+                  +{formatPoints(r.placement[m])}
+                </td>
               </tr>
             ))}
           </tbody>
         </table>
       </div>
       <p className="small muted" style={{ margin: 0 }}>
-        Placement points 5 / 3 / 1 / 0. Shared places split the occupied places exactly (e.g. two tied for 1st
-        get 4 each).
+        {t('placementNote')}
       </p>
       <Timer
         end={mn.phaseEnd}
         start={mn.phaseEnd !== null ? mn.phaseEnd - 15_000 : null}
-        label="Next mode in"
+        label={t('nextModeIn')}
       />
-      {!isHost && frozen && <p className="small muted">Paused by host.</p>}
+      {!isHost && frozen && <p className="small muted">{t('pausedByHost')}</p>}
     </div>
   );
 }
 
 function Standings({ mn }: { mn: MN }) {
-  const names = memberNames(useGameView());
-  const { t } = useI18n();
+  const names = memberNames(useGame().view);
+  const { t, locale } = useI18n();
   const done = mn.results.filter((r) => !r.skipped).length;
   return (
     <section className="card">
@@ -321,10 +317,10 @@ function Standings({ mn }: { mn: MN }) {
         <table className="table">
           <thead>
             <tr>
-              <th>#</th>
-              <th>Player</th>
-              <th>Pts</th>
-              <th title="Sole 1st / 2nd / 3rd finishes">1·2·3</th>
+              <th>{t('rank')}</th>
+              <th>{t('player_col')}</th>
+              <th>{t('pts')}</th>
+              <th title={t('soleFinishes')}>1·2·3</th>
             </tr>
           </thead>
           <tbody>
@@ -334,10 +330,10 @@ function Standings({ mn }: { mn: MN }) {
                 <td className="truncate" style={{ maxWidth: 140 }}>
                   {names[s.memberId]}
                 </td>
-                <td className="num accent" title={`Exact: ${s.points}`}>
+                <td className="num accent" title={s.points} dir="ltr">
                   {s.display}
                 </td>
-                <td className="small muted">
+                <td className="small muted" dir="ltr">
                   {s.sole1}·{s.sole2}·{s.sole3}
                 </td>
               </tr>
@@ -346,14 +342,13 @@ function Standings({ mn }: { mn: MN }) {
         </table>
       </div>
       <p className="small muted" style={{ marginBottom: 0 }}>
-        {done} of {mn.modes.length} modes scored. Ladder: points → sole 1sts → sole 2nds → sole 3rds →
-        tie-break questions.
+        {t('modesScored', { done, n: mn.modes.length })}
       </p>
       {mn.results
         .filter((r) => r.skipped)
         .map((r) => (
           <p key={r.key} className="small" style={{ color: 'var(--warn)' }}>
-            {MODES[r.key].name.en} skipped: {r.skipped}
+            {t('skippedBecause', { mode: modeName(r.key, locale), reason: t('skippedReason') })}
           </p>
         ))}
     </section>
@@ -362,8 +357,8 @@ function Standings({ mn }: { mn: MN }) {
 
 function Final({ mn }: { mn: MN }) {
   const f = mn.final!;
-  const names = memberNames(useGameView());
-  const { t } = useI18n();
+  const names = memberNames(useGame().view);
+  const { t, locale } = useI18n();
   const shared = f.champions.length > 1;
   return (
     <div className="stage">
@@ -375,18 +370,14 @@ function Final({ mn }: { mn: MN }) {
         <h2 className="display h1" style={{ fontSize: 'clamp(38px, 10vw, 64px)' }}>
           {f.champions.map((c) => names[c]).join(' & ')}
         </h2>
-        {f.tiebreakUsed && (
-          <p className="muted">
-            Decided after the championship tie-break{shared ? ' — still level after five questions' : ''}.
-          </p>
-        )}
+        {f.tiebreakUsed && <p className="muted">{shared ? t('stillLevel') : t('decidedTiebreak')}</p>}
       </div>
-      <div className="eyebrow">Mode breakdown</div>
+      <div className="eyebrow">{t('modeBreakdown')}</div>
       <div className="table-wrap">
         <table className="table">
           <thead>
             <tr>
-              <th>Mode</th>
+              <th>{t('modeCol')}</th>
               {mn.participants.map((p) => (
                 <th key={p}>{names[p]}</th>
               ))}
@@ -396,7 +387,7 @@ function Final({ mn }: { mn: MN }) {
             {mn.results.map((r) => (
               <tr key={r.key}>
                 <td>
-                  {MODES[r.key].name.en}
+                  {modeName(r.key, locale)}
                   {r.skipped && (
                     <span className="badge warn" style={{ marginInlineStart: 6 }}>
                       {t('skipped')}
@@ -404,7 +395,7 @@ function Final({ mn }: { mn: MN }) {
                   )}
                 </td>
                 {mn.participants.map((p) => (
-                  <td key={p} className="num">
+                  <td key={p} className="num" dir="ltr">
                     {r.skipped || r.placement[p] === undefined ? '—' : formatPoints(r.placement[p])}
                   </td>
                 ))}
@@ -412,10 +403,10 @@ function Final({ mn }: { mn: MN }) {
             ))}
             <tr>
               <td>
-                <strong>Total</strong>
+                <strong>{t('total')}</strong>
               </td>
               {mn.participants.map((p) => (
-                <td key={p} className="num accent">
+                <td key={p} className="num accent" dir="ltr">
                   {formatPoints(f.standings.find((s) => s.memberId === p)?.points)}
                 </td>
               ))}
@@ -447,22 +438,23 @@ function Appeals({ view }: { view: RoomView }) {
   const rem = useRemaining(win?.closesAt);
   const mine = view.appeals.filter((a) => a.mine);
   const toResolve = view.appeals.filter((a) => a.canResolve);
+  const statusText = (s: string) => t(`status_${s}` as 'status_PENDING');
   if (!win && mine.length === 0 && !isJudge && view.appeals.length === 0) return null;
   return (
     <section className="card stack">
       <h2 className="display h3 card-title">⚖ {isJudge ? t('judging') : t('appeals')}</h2>
       {win && (
         <button className="btn block" onClick={() => setOpen(win.itemIndex)}>
-          {t('appealOpen')} · {Math.ceil((rem ?? 0) / 1000)}s
+          {t('appealIn', { s: Math.ceil((rem ?? 0) / 1000) })}
         </button>
       )}
       {mine.map((a) => (
         <div key={a.id} className="list-item small">
-          <span className="grow">Your appeal (Q{a.itemIndex + 1})</span>
+          <span className="grow">{t('yourAppeal', { n: a.itemIndex + 1 })}</span>
           <span
             className={`badge ${a.status === 'PENDING' ? 'warn' : a.status === 'ACCEPTED' ? 'ok' : 'bad'}`}
           >
-            {a.status.replace('_', ' ').toLowerCase()}
+            {statusText(a.status)}
           </span>
         </div>
       ))}
@@ -484,7 +476,11 @@ function Appeals({ view }: { view: RoomView }) {
         .filter((a) => !a.mine && !a.canResolve && a.status !== 'PENDING')
         .map((a) => (
           <p key={a.id} className="small muted" style={{ margin: 0 }}>
-            {names[a.claimantId]}’s appeal on Q{a.itemIndex + 1}: {a.status.replace('_', ' ').toLowerCase()}
+            {t('othersAppeal', {
+              name: names[a.claimantId] ?? '',
+              n: a.itemIndex + 1,
+              status: statusText(a.status),
+            })}
             {a.decisionNote ? ` — ${a.decisionNote}` : ''}
           </p>
         ))}
@@ -502,27 +498,22 @@ function Appeals({ view }: { view: RoomView }) {
             }}
           >
             <p className="muted small" style={{ margin: 0 }}>
-              Your original answer and its server timestamp are preserved and cannot be edited. One appeal per
-              question. If no neutral judge is available the question is voided for everyone.
+              {t('appealHelp')}
             </p>
             <fieldset className="stack" style={{ border: 0, padding: 0, margin: 0 }}>
               <legend className="label">{t('appealReason')}</legend>
               {REASONS.map((r) => (
-                <label key={r.key} className="list-item" style={{ cursor: 'pointer' }}>
-                  <input
-                    type="radio"
-                    name="reason"
-                    checked={reason === r.key}
-                    onChange={() => setReason(r.key)}
-                  />{' '}
-                  {r.label}
+                <label key={r} className="list-item" style={{ cursor: 'pointer' }}>
+                  <input type="radio" name="reason" checked={reason === r} onChange={() => setReason(r)} />{' '}
+                  {t(`reason_${r}` as 'reason_TECHNICAL_ISSUE')}
                 </label>
               ))}
             </fieldset>
             <textarea
               className="textarea"
+              dir="auto"
               maxLength={280}
-              placeholder="Optional details for the judge"
+              placeholder={t('appealNote')}
               value={note}
               onChange={(e) => setNote(e.target.value)}
             />
@@ -566,24 +557,29 @@ function ResolveAppeal({
   return (
     <div className="card tight stack" style={{ background: 'var(--bg-2)' }}>
       <div>
-        <strong>{name}</strong> · Q{a.itemIndex + 1} · {a.reason.replaceAll('_', ' ').toLowerCase()}
+        <strong>{name}</strong> · {t('question')} {a.itemIndex + 1} ·{' '}
+        {t(`reason_${a.reason}` as 'reason_TECHNICAL_ISSUE')}
       </div>
-      {a.note && <div className="small muted">“{a.note}”</div>}
+      {a.note && (
+        <div className="small muted" dir="auto">
+          «{a.note}»
+        </div>
+      )}
       <p className="small muted" style={{ margin: 0 }}>
-        Review the original answer, timestamp and source shown on the reveal screen. Timers are frozen until
-        you decide.
+        {t('judgeReview')}
       </p>
       {isTop25 && (
         <input
           className="input"
           inputMode="numeric"
-          placeholder="Rank to accept (TOP 25)"
+          placeholder={t('top25Rank')}
           value={rank}
           onChange={(e) => setRank(e.target.value.replace(/\D/g, ''))}
         />
       )}
       <input
         className="input"
+        dir="auto"
         placeholder={t('decisionNote')}
         value={note}
         onChange={(e) => setNote(e.target.value)}

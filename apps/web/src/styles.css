@@ -950,3 +950,262 @@ a {
   font-size: 12px;
   word-break: break-all;
 }
+
+/* ===================================================================
+   v2: Egyptian-Arabic first, laptop + mobile layouts
+   =================================================================== */
+[dir='rtl'] {
+  --font-display: 'Cairo', 'Barlow Condensed', system-ui, sans-serif;
+  --font-body: 'Cairo', 'Inter', system-ui, sans-serif;
+}
+[dir='rtl'] .display {
+  text-transform: none;
+  letter-spacing: 0;
+  line-height: 1.15;
+  font-weight: 900;
+}
+[dir='rtl'] .eyebrow {
+  letter-spacing: 0;
+  font-weight: 700;
+}
+[dir='rtl'] .btn.primary,
+[dir='rtl'] .modecard .name,
+[dir='rtl'] .badge {
+  text-transform: none;
+  letter-spacing: 0;
+}
+[dir='rtl'] .prompt {
+  line-height: 1.35;
+}
+
+.shell {
+  max-width: 1280px;
+}
+
+/* home */
+.hero {
+  display: grid;
+  gap: 24px;
+  padding: 32px 20px;
+}
+.hero-tagline {
+  max-width: 520px;
+  font-size: 18px;
+  margin: 0;
+}
+.hero-actions {
+  max-width: 440px;
+  width: 100%;
+}
+@media (min-width: 900px) {
+  .hero {
+    grid-template-columns: 1.3fr 1fr;
+    align-items: center;
+    padding: 56px 48px;
+  }
+  .hero-actions {
+    justify-self: end;
+  }
+}
+.mode-strip {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr));
+}
+.mode-chip {
+  appearance: none;
+  text-align: start;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 10px;
+  row-gap: 2px;
+  align-items: center;
+  min-height: 72px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  cursor: pointer;
+  transition:
+    border-color var(--dur),
+    transform var(--dur) var(--ease);
+}
+.mode-chip:hover:not([disabled]) {
+  border-color: var(--accent);
+  transform: translateY(-1px);
+}
+.mode-chip[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+.mode-num {
+  grid-row: span 2;
+  font-family: 'Barlow Condensed', var(--font-display);
+  font-weight: 800;
+  font-size: 26px;
+  color: var(--accent);
+  min-width: 2ch;
+}
+.mode-chip-name {
+  font-family: var(--font-display);
+  font-weight: 800;
+  font-size: 18px;
+  line-height: 1.2;
+}
+.mode-chip-concept {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* entry */
+.entry-card {
+  max-width: 500px;
+  width: 100%;
+  margin: 0 auto;
+}
+@media (min-width: 900px) {
+  .entry-card {
+    margin-top: 32px;
+    padding: 28px;
+  }
+}
+
+/* lobby + game: main column + sticky side column on laptops */
+.lobby-grid,
+.game-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 900px) {
+  .lobby-grid {
+    grid-template-columns: minmax(0, 1.6fr) minmax(320px, 1fr);
+    align-items: start;
+  }
+  .game-grid {
+    grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+    align-items: start;
+  }
+  .side {
+    position: sticky;
+    top: 16px;
+  }
+  .stage-card {
+    padding: 24px 28px;
+    min-height: 60vh;
+  }
+}
+@media (max-width: 899px) {
+  /* Phones: code, then Ready/Kick off, then players, then the (long) playlist. */
+  .lobby-grid > .stack,
+  .lobby-grid > .stack.side {
+    display: contents;
+  }
+  .lobby-grid .code-card {
+    order: 1;
+  }
+  .lobby-grid .kickoff-card {
+    order: 2;
+  }
+  .lobby-grid .players-card {
+    order: 3;
+  }
+  .lobby-grid .playlist-card {
+    order: 4;
+  }
+  .code-card .bigcode {
+    font-size: clamp(40px, 14vw, 64px);
+  }
+}
+.lobby-grid > .side {
+  display: flex;
+  flex-direction: column;
+}
+.code-card {
+  text-align: center;
+}
+.preset-seg {
+  margin-bottom: 12px;
+  overflow-x: auto;
+  grid-auto-columns: minmax(max-content, 1fr);
+}
+.preset-seg button {
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+/* answers */
+.answer-form {
+  display: flex;
+  gap: 10px;
+}
+.answer-form .input {
+  flex: 1;
+  min-width: 0;
+}
+@media (max-width: 420px) {
+  .answer-form {
+    flex-direction: column;
+  }
+}
+.timer-row {
+  flex-wrap: nowrap;
+  gap: 12px;
+}
+.host-bar {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 8px 10px;
+}
+@media (max-width: 520px) {
+  .host-bar .btn {
+    flex: 1 1 auto;
+  }
+}
+/* phones: game stage first, keep the timer visible while scrolling long screens */
+@media (max-width: 899px) {
+  .stage-card .stage > .stack:first-child {
+    position: sticky;
+    top: 0;
+    z-index: 5;
+    background: var(--surface);
+    padding-block: 6px;
+    margin-block: -6px;
+  }
+}
+.options .option {
+  font-size: 18px;
+}
+[dir='rtl'] .verdict {
+  margin-inline-start: auto;
+}
+
+/* Table row edges follow the PAGE direction (cells may carry dir=ltr for numbers). */
+.table td:first-child,
+.table td:last-child {
+  border-inline-start: 0;
+  border-inline-end: 0;
+  border-radius: 0;
+}
+html[dir='ltr'] .table td:first-child,
+html[dir='rtl'] .table td:last-child {
+  border-left: 1px solid var(--line);
+  border-top-left-radius: 10px;
+  border-bottom-left-radius: 10px;
+}
+html[dir='ltr'] .table td:last-child,
+html[dir='rtl'] .table td:first-child {
+  border-right: 1px solid var(--line);
+  border-top-right-radius: 10px;
+  border-bottom-right-radius: 10px;
+}
+.table td[dir='ltr'] {
+  text-align: start;
+}
+html[dir='rtl'] .table td[dir='ltr'] {
+  text-align: right;
+}

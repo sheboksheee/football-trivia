@@ -1,29 +1,30 @@
 import { useEffect, useMemo, useState } from 'react';
 import { MODES, MODE_KEYS, PRESET_SIZES, type ModeKey } from '@ft/shared';
 import type { RoomView } from '@ft/game-rules';
-import { useI18n } from '../i18n.js';
+import { useI18n, type TFn, type TKey } from '../i18n.js';
+import { modeCopy, modeName } from '../modeText.js';
 import { client } from '../net/client.js';
 import { Avatar, Banner } from '../ui/common.js';
 
 type Preset = 'SINGLE' | 'QUICK' | 'CLASSIC' | 'MARATHON' | 'CUSTOM';
-const PRESETS: Array<{ key: Preset; label: string; size: string }> = [
-  { key: 'SINGLE', label: 'Single mode', size: '1' },
-  { key: 'QUICK', label: 'Quick Match', size: '3' },
-  { key: 'CLASSIC', label: 'Classic Night', size: '5' },
-  { key: 'MARATHON', label: 'Full Marathon', size: '12' },
-  { key: 'CUSTOM', label: 'Custom', size: '2–12' },
+const PRESETS: Array<{ key: Preset; label: TKey; size: string }> = [
+  { key: 'SINGLE', label: 'presetSingle', size: '1' },
+  { key: 'QUICK', label: 'presetQuick', size: '3' },
+  { key: 'CLASSIC', label: 'presetClassic', size: '5' },
+  { key: 'MARATHON', label: 'presetMarathon', size: '12' },
+  { key: 'CUSTOM', label: 'presetCustom', size: '2–12' },
 ];
 
-function presetValid(p: Preset, modes: ModeKey[]): string | null {
-  if (p === 'SINGLE') return modes.length === 1 ? null : 'Pick exactly 1 mode';
-  if (p === 'CUSTOM') return modes.length >= 2 && modes.length <= 12 ? null : 'Pick 2–12 modes';
-  if (p === 'MARATHON') return 'Full Marathon needs all 12 modes; Who Am I? is awaiting approved rules';
+function presetValid(p: Preset, modes: ModeKey[], t: TFn): string | null {
+  if (p === 'SINGLE') return modes.length === 1 ? null : t('pickExactly', { n: 1, count: modes.length });
+  if (p === 'CUSTOM') return modes.length >= 2 && modes.length <= 12 ? null : t('pickRange');
+  if (p === 'MARATHON') return t('marathonBlocked');
   const n = PRESET_SIZES[p];
-  return modes.length === n ? null : `Pick exactly ${n} modes (${modes.length} selected)`;
+  return modes.length === n ? null : t('pickExactly', { n, count: modes.length });
 }
 
 export function Lobby({ view }: { view: RoomView }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
   const me = view.me;
   const isHost = !!me?.isHost;
   const players = view.members.filter((m) => m.role === 'PLAYER');
@@ -53,7 +54,7 @@ export function Lobby({ view }: { view: RoomView }) {
     };
   }, []);
 
-  const invalid = presetValid(preset, modes);
+  const invalid = presetValid(preset, modes, t);
   const link = `${location.origin}/#/join/${view.room.code}`;
   const minutes = useMemo(
     () => view.room.playlist.modes.reduce((a, k) => a + MODES[k].estimatedMinutes, 0),
@@ -81,39 +82,42 @@ export function Lobby({ view }: { view: RoomView }) {
     }
   };
   const myReady = view.members.find((m) => m.id === me?.memberId)?.ready;
+  const issueText = (i: RoomView['startIssues'][number]) =>
+    t(`issue_${i.code}` as TKey, { ...i.params, mode: i.mode ? modeName(i.mode, locale) : '' });
 
   return (
-    <div className="grid-2">
+    <div className="lobby-grid">
       <div className="stack">
-        <section className="card pitch" style={{ textAlign: 'center' }}>
+        <section className="card pitch code-card">
           <div className="eyebrow">{t('shareCode')}</div>
-          <div className="bigcode" aria-label={`Room code ${view.room.code.split('').join(' ')}`}>
+          <div
+            className="bigcode"
+            dir="ltr"
+            aria-label={`${t('roomCode')} ${view.room.code.split('').join(' ')}`}
+          >
             {view.room.code}
           </div>
           <div className="row" style={{ justifyContent: 'center', marginTop: 10 }}>
             <button className="btn sm" onClick={copy}>
               {copied ? t('copied') : t('copy')}
             </button>
-            <span className="badge">{view.room.status === 'READY_CHECK' ? 'Ready check' : t('lobby')}</span>
+            <span className="badge">
+              {view.room.status === 'READY_CHECK' ? t('readyCheckBadge') : t('lobby')}
+            </span>
           </div>
         </section>
 
-        <section className="card">
+        <section className="card playlist-card">
           <h2 className="display h3 card-title">
             {t('playlist')}{' '}
             {!isHost && (
               <span className="small muted" style={{ textTransform: 'none', fontFamily: 'var(--font-body)' }}>
-                · set by the host · ~{minutes} min
+                · {t('setByHost', { min: minutes })}
               </span>
             )}
           </h2>
           {isHost && (
-            <div
-              className="seg"
-              role="group"
-              aria-label="Preset"
-              style={{ marginBottom: 12, overflowX: 'auto' }}
-            >
+            <div className="seg preset-seg" role="group" aria-label={t('playlist')}>
               {PRESETS.map((p) => (
                 <button
                   key={p.key}
@@ -123,7 +127,7 @@ export function Lobby({ view }: { view: RoomView }) {
                     if (p.key === 'SINGLE') setModes((m) => m.slice(0, 1));
                   }}
                 >
-                  {p.label} <span className="muted small">{p.size}</span>
+                  {t(p.label)} <span className="muted small">{p.size}</span>
                 </button>
               ))}
             </div>
@@ -131,6 +135,7 @@ export function Lobby({ view }: { view: RoomView }) {
           <div className="modes">
             {MODE_KEYS.map((k) => {
               const m = MODES[k];
+              const c = modeCopy(k, locale);
               const order = modes.indexOf(k);
               const blocked = m.rulesStatus === 'BLOCKED';
               const published = availability?.[k]?.published;
@@ -144,11 +149,11 @@ export function Lobby({ view }: { view: RoomView }) {
                   aria-pressed={order >= 0}
                   disabled={!isHost || blocked}
                   onClick={() => toggle(k)}
-                  title={blocked ? m.blockers.join(' ') : m.rules}
+                  title={blocked ? c.blockers.join(' ') : c.rules}
                 >
                   {order >= 0 && <span className="order">{order + 1}</span>}
-                  <span className="name">{m.name.en}</span>
-                  <span className="small muted">{m.concept}</span>
+                  <span className="name">{c.name}</span>
+                  <span className="small muted">{c.concept}</span>
                   <span className="row" style={{ gap: 6, marginTop: 'auto' }}>
                     <span
                       className={`badge ${m.rulesStatus === 'APPROVED' ? 'ok' : m.rulesStatus === 'PROVISIONAL' ? 'warn' : 'bad'}`}
@@ -164,11 +169,11 @@ export function Lobby({ view }: { view: RoomView }) {
                     )}
                     {m.minPlayers > 2 && (
                       <span className={`badge ${tooFew ? 'bad' : ''}`}>
-                        {m.minPlayers}+ {t('minPlayers')}
+                        {t('playersMin', { n: m.minPlayers })}
                       </span>
                     )}
                     {published !== undefined && !blocked && published < 5 && (
-                      <span className="badge warn">{published} items</span>
+                      <span className="badge warn">{t('itemsCount', { n: published })}</span>
                     )}
                   </span>
                 </button>
@@ -178,28 +183,31 @@ export function Lobby({ view }: { view: RoomView }) {
           {isHost && (
             <div className="row" style={{ marginTop: 12 }}>
               <span className={`small ${invalid ? 'field-error' : 'muted'}`}>
-                {invalid ?? `${modes.length} mode(s) selected`}
+                {invalid ?? t('selectedCount', { n: modes.length })}
               </span>
               <span className="spacer" />
               <button className="btn" disabled={!dirty || !!invalid} onClick={apply}>
-                Save playlist
+                {t('savePlaylist')}
               </button>
             </div>
           )}
         </section>
       </div>
 
-      <div className="stack">
-        <section className="card">
+      <div className="stack side">
+        <section className="card players-card">
           <h2 className="display h3 card-title">
-            {t('players')} <span className="muted">{players.length}/6</span>
+            {t('players')}{' '}
+            <span className="muted" dir="ltr">
+              {players.length}/6
+            </span>
           </h2>
           <ul className="list">
             {players.map((p) => (
               <li key={p.id} className="list-item">
                 <Avatar id={p.id} name={p.name} />
                 <span className="grow truncate">
-                  {p.name} {p.id === me?.memberId && <span className="muted small">(you)</span>}
+                  {p.name} {p.id === me?.memberId && <span className="muted small">{t('you')}</span>}
                 </span>
                 {p.id === view.room.hostId && <span className="badge info">{t('host')}</span>}
                 {p.id === view.room.coHostId && <span className="badge">{t('coHost')}</span>}
@@ -227,13 +235,11 @@ export function Lobby({ view }: { view: RoomView }) {
               </ul>
             </>
           )}
-          <p className="small muted">
-            👁 {view.spectatorCount} {t('spectators')}
-          </p>
+          <p className="small muted">👁 {t('spectatorsCount', { n: view.spectatorCount })}</p>
           {isHost && players.length > 1 && (
             <div className="field">
               <label className="label" htmlFor="cohost">
-                {t('coHost')} (takes over if you disconnect)
+                {t('coHostLabel')}
               </label>
               <select
                 id="cohost"
@@ -250,7 +256,7 @@ export function Lobby({ view }: { view: RoomView }) {
                   })
                 }
               >
-                <option value="">None — longest-present player</option>
+                <option value="">{t('coHostNone')}</option>
                 {players
                   .filter((p) => p.id !== me?.memberId)
                   .map((p) => (
@@ -263,7 +269,7 @@ export function Lobby({ view }: { view: RoomView }) {
           )}
         </section>
 
-        <section className="card stack">
+        <section className="card stack kickoff-card">
           {me?.role === 'PLAYER' && (
             <button
               className={`btn block ${myReady ? '' : 'primary'}`}
@@ -273,10 +279,10 @@ export function Lobby({ view }: { view: RoomView }) {
             </button>
           )}
           {view.startIssues.length > 0 && (
-            <ul className="list" aria-label="Before kick-off">
-              {view.startIssues.map((s) => (
-                <li key={s} className="small muted">
-                  • {s}
+            <ul className="list" aria-label={t('beforeKickoff')}>
+              {view.startIssues.map((s, i) => (
+                <li key={i} className="small muted">
+                  • {issueText(s)}
                 </li>
               ))}
             </ul>
@@ -308,11 +314,11 @@ export function Lobby({ view }: { view: RoomView }) {
               </button>
             </div>
           ) : (
-            <Banner>{me?.role === 'SPECTATOR' ? t('spectating') : t('waitingHost')}</Banner>
+            <Banner>{me?.role === 'SPECTATOR' || !me ? t('spectating') : t('waitingHost')}</Banner>
           )}
-          {MODES.who_am_i && view.room.playlist.modes.some((k) => MODES[k].rulesStatus === 'PROVISIONAL') && (
+          {view.room.playlist.modes.some((k) => MODES[k].rulesStatus === 'PROVISIONAL') && (
             <p className="small muted" style={{ margin: 0 }}>
-              Provisional modes use proposed parameters pending product approval (see How to play).
+              {t('provisionalNote')}
             </p>
           )}
         </section>

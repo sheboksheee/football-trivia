@@ -223,7 +223,20 @@ function audit(
 
 // ---------------------------------------------------------------- playlist validation
 
+export type IssueCode =
+  | 'DUPLICATE_MODE'
+  | 'PRESET_SIZE'
+  | 'MODE_BLOCKED'
+  | 'TOO_FEW_PLAYERS'
+  | 'TOO_MANY_PLAYERS'
+  | 'MODE_MIN_PLAYERS'
+  | 'NEEDS_JUDGE'
+  | 'NOT_READY';
+
 export interface PlaylistIssue {
+  /** Stable code + params so clients can localise; `message` is the English fallback. */
+  code: IssueCode;
+  params: Record<string, string | number>;
   mode: ModeKey | null;
   message: string;
 }
@@ -231,16 +244,41 @@ export interface PlaylistIssue {
 export function validatePlaylist(preset: Preset, modes: ModeKey[]): PlaylistIssue[] {
   const issues: PlaylistIssue[] = [];
   if (new Set(modes).size !== modes.length)
-    issues.push({ mode: null, message: 'Each mode can appear only once' });
+    issues.push({
+      code: 'DUPLICATE_MODE',
+      params: {},
+      mode: null,
+      message: 'Each mode can appear only once',
+    });
   if (preset === 'SINGLE' && modes.length !== 1)
-    issues.push({ mode: null, message: 'Single mode needs exactly 1 mode' });
+    issues.push({
+      code: 'PRESET_SIZE',
+      params: { min: 1, max: 1 },
+      mode: null,
+      message: 'Single mode needs exactly 1 mode',
+    });
   if (preset === 'CUSTOM' && (modes.length < 2 || modes.length > 12))
-    issues.push({ mode: null, message: 'Custom Match Night needs 2–12 modes' });
+    issues.push({
+      code: 'PRESET_SIZE',
+      params: { min: 2, max: 12 },
+      mode: null,
+      message: 'Custom Match Night needs 2–12 modes',
+    });
   if (preset !== 'CUSTOM' && preset !== 'SINGLE' && modes.length !== PRESET_SIZES[preset])
-    issues.push({ mode: null, message: `${preset} needs exactly ${PRESET_SIZES[preset]} modes` });
+    issues.push({
+      code: 'PRESET_SIZE',
+      params: { min: PRESET_SIZES[preset], max: PRESET_SIZES[preset] },
+      mode: null,
+      message: `${preset} needs exactly ${PRESET_SIZES[preset]} modes`,
+    });
   for (const k of modes) {
     if (MODES[k].rulesStatus === 'BLOCKED')
-      issues.push({ mode: k, message: `${MODES[k].name.en} is not playable: rules awaiting approval` });
+      issues.push({
+        code: 'MODE_BLOCKED',
+        params: {},
+        mode: k,
+        message: `${MODES[k].name.en} is not playable: rules awaiting approval`,
+      });
   }
   return issues;
 }
@@ -251,18 +289,44 @@ export function startIssues(s: RoomState): PlaylistIssue[] {
   const players = activePlayers(s);
   const judges = activeJudges(s).filter((j) => j.connected);
   if (players.length < MIN_PLAYERS)
-    issues.push({ mode: null, message: `Need at least ${MIN_PLAYERS} players` });
-  if (players.length > MAX_PLAYERS) issues.push({ mode: null, message: `At most ${MAX_PLAYERS} players` });
+    issues.push({
+      code: 'TOO_FEW_PLAYERS',
+      params: { n: MIN_PLAYERS },
+      mode: null,
+      message: `Need at least ${MIN_PLAYERS} players`,
+    });
+  if (players.length > MAX_PLAYERS)
+    issues.push({
+      code: 'TOO_MANY_PLAYERS',
+      params: { n: MAX_PLAYERS },
+      mode: null,
+      message: `At most ${MAX_PLAYERS} players`,
+    });
   for (const k of s.playlist.modes) {
     const info = MODES[k];
     if (players.length < info.minPlayers)
-      issues.push({ mode: k, message: `${info.name.en} needs ${info.minPlayers}+ players` });
+      issues.push({
+        code: 'MODE_MIN_PLAYERS',
+        params: { n: info.minPlayers },
+        mode: k,
+        message: `${info.name.en} needs ${info.minPlayers}+ players`,
+      });
     if (info.judge === 'required' && judges.length === 0)
-      issues.push({ mode: k, message: `${info.name.en} needs a neutral judge (join as Judge)` });
+      issues.push({
+        code: 'NEEDS_JUDGE',
+        params: {},
+        mode: k,
+        message: `${info.name.en} needs a neutral judge (join as Judge)`,
+      });
   }
   const notReady = players.filter((p) => !p.ready);
   if (notReady.length > 0)
-    issues.push({ mode: null, message: `Waiting for ${notReady.map((p) => p.name).join(', ')} to be ready` });
+    issues.push({
+      code: 'NOT_READY',
+      params: { names: notReady.map((p) => p.name).join('، ') },
+      mode: null,
+      message: `Waiting for ${notReady.map((p) => p.name).join(', ')} to be ready`,
+    });
   return issues;
 }
 
@@ -1122,8 +1186,7 @@ export function project(s: RoomState, viewer: Viewer, at: number) {
     clock: { gameNow: g, frozen: isFrozen(s), reasons: s.clock.reasons },
     pause: s.pause ? { emergency: s.pause.emergency, reason: s.pause.reason, since: s.pause.since } : null,
     pausePending: !!s.pausePending,
-    startIssues:
-      s.status === 'LOBBY' || s.status === 'READY_CHECK' ? startIssues(s).map((i) => i.message) : [],
+    startIssues: s.status === 'LOBBY' || s.status === 'READY_CHECK' ? startIssues(s) : [],
     matchNight: mn
       ? {
           preset: mn.preset,

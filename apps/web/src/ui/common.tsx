@@ -3,7 +3,7 @@ import type { RoomView } from '@ft/game-rules';
 import { Fraction } from '@ft/shared';
 import { useGame, useRemaining } from '../net/hooks.js';
 import { client } from '../net/client.js';
-import { useI18n } from '../i18n.js';
+import { ERROR_TEXT, useI18n } from '../i18n.js';
 
 const AVATAR_COLORS = ['#B7FF43', '#6CC6FF', '#FFC94A', '#FF8FB1', '#C9A7FF', '#7DF0D0'];
 
@@ -39,6 +39,7 @@ export function Timer({
   label?: string;
 }) {
   const { view } = useGame();
+  const { t, locale } = useI18n();
   const rem = useRemaining(end);
   if (rem === null || end === null || end === undefined) return null;
   const total = start !== null && start !== undefined ? Math.max(1, end - start) : Math.max(rem, 1);
@@ -46,13 +47,12 @@ export function Timer({
   const frozen = view?.clock.frozen;
   const low = rem < 3000 && !frozen;
   const secs = Math.ceil(rem / 1000);
+  const aria =
+    locale === 'ar'
+      ? `${label ?? t('timeLeft')}: ${secs} ثانية${frozen ? ' (واقف)' : ''}`
+      : `${label ?? t('timeLeft')}: ${secs} seconds${frozen ? ' (paused)' : ''}`;
   return (
-    <div
-      className="row"
-      style={{ flexWrap: 'nowrap', gap: 12 }}
-      role="timer"
-      aria-label={`${label ?? 'Time left'}: ${secs} seconds${frozen ? ' (paused)' : ''}`}
-    >
+    <div className="row timer-row" role="timer" aria-label={aria}>
       <div className={`timer ${low ? 'low' : ''} ${frozen ? 'frozen' : ''}`} style={{ flex: 1 }}>
         <i style={{ width: `${pct}%` }} />
       </div>
@@ -82,12 +82,13 @@ export function ScoreStrip({
   highlight?: string | null;
 }) {
   const { view, memberId } = useGame();
+  const { t } = useI18n();
   const names = memberNames(view);
   const sorted = [...players].sort((a, b) =>
     Fraction.parse(scores[b] ?? '0').cmp(Fraction.parse(scores[a] ?? '0')),
   );
   return (
-    <div className="scorestrip" aria-label="Scores">
+    <div className="scorestrip" aria-label={t('scores')}>
       {sorted.map((p) => (
         <div
           key={p}
@@ -98,7 +99,9 @@ export function ScoreStrip({
           <span className="small truncate" style={{ maxWidth: 110 }}>
             {names[p] ?? '—'}
           </span>
-          <span className="num">{formatPoints(scores[p])}</span>
+          <span className="num" dir="ltr">
+            {formatPoints(scores[p])}
+          </span>
         </div>
       ))}
     </div>
@@ -122,19 +125,22 @@ export function Banner({
   );
 }
 
+/** Shows the last command error, translated by error code where possible. */
 export function ErrorToast() {
-  const { lastError } = useGame();
-  const { t } = useI18n();
+  const { lastError, lastErrorCode } = useGame();
+  const { t, locale } = useI18n();
   useEffect(() => {
     if (!lastError) return;
     const timer = setTimeout(() => client.clearError(), 5000);
     return () => clearTimeout(timer);
   }, [lastError]);
   if (!lastError) return null;
+  const text =
+    (lastErrorCode && ERROR_TEXT[locale][lastErrorCode]) || (locale === 'en' ? lastError : t('err_generic'));
   return (
     <div className="toast-host">
       <div className="toast banner bad" role="alert">
-        <span style={{ flex: 1 }}>{lastError}</span>
+        <span style={{ flex: 1 }}>{text}</span>
         <button className="btn ghost sm" onClick={() => client.clearError()}>
           {t('cancel')}
         </button>

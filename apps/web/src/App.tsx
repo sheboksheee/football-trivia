@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { DICTS, I18nContext, type Locale } from './i18n.js';
+import { I18nContext, makeT, type Locale } from './i18n.js';
 import { ConnectionBadge, ErrorToast } from './ui/common.js';
 import { Home } from './screens/Home.js';
 import { Entry } from './screens/Entry.js';
@@ -15,7 +15,8 @@ function initialLocale(): Locale {
   } catch {
     /* ignore */
   }
-  return navigator.language.startsWith('ar') ? 'ar' : 'en';
+  // Egyptian Arabic is the primary language of the game; English is one tap away.
+  return 'ar';
 }
 
 function useHash() {
@@ -43,10 +44,7 @@ export function App() {
       /* ignore */
     }
   }, [locale]);
-  const i18n = useMemo(
-    () => ({ locale, setLocale, t: (k: keyof (typeof DICTS)['en']) => DICTS[locale][k] }),
-    [locale],
-  );
+  const i18n = useMemo(() => ({ locale, setLocale, t: makeT(locale) }), [locale]);
   const parts = hash.replace(/^#\/?/, '').split('/');
   let page;
   switch (parts[0]) {
@@ -71,13 +69,13 @@ export function App() {
   return (
     <I18nContext.Provider value={i18n}>
       <a href="#main" className="sr-only">
-        Skip to content
+        {i18n.t('skipToContent')}
       </a>
       <div className="shell">
         <header className="topbar">
-          <button className="brand" onClick={() => go('#/')} aria-label="Football Trivia home">
+          <button className="brand" onClick={() => go('#/')} aria-label={i18n.t('home')}>
             <span className="brand-mark" aria-hidden="true">
-              FT
+              ⚽
             </span>
             <span>{i18n.t('appName')}</span>
           </button>

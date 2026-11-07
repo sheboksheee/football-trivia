@@ -72,6 +72,6 @@ Legend: **APPROVED** = user-confirmed (authoritative). **PROPOSED** = chosen by 
 - Fonts load from Google Fonts (OFL fonts, no files shipped). Privacy review may require self-hosting.
 - Content: fictional fixture with deterministic generator; DEV policy auto-publishes fixture content; production defaults to STRICT (human review for everything). TOP 25 lists use a documented tie-break ("fewer league starts ranks higher"); lists still tied after it are rejected.
 - Difficulty weights (Blueprint C1) and pilot calibration threshold (50 responses) used as starting hypotheses only.
-- Arabic UI strings are a first-pass translation needing native review; question content is English-only.
+- **Language:** Egyptian colloquial Arabic ("rosh" tone) is the default UI language, with English one tap away. Every screen, mode name, rule text, error and lobby message is localised (`apps/web/src/i18n.ts`, `apps/web/src/modeText.ts`); server start-issues carry stable codes so the client can translate them. Arabic font: Cairo (Google Fonts, OFL). The copy needs a native review before launch. **Question content (prompts, players, clubs) is still English**: it comes from the fictional English-language dataset — Arabic question templates are a follow-up task.
 
 Keep this log updated when the user approves or changes any item. Approving a PROPOSED item = move it to "Approved" and set the mode's `rulesStatus` to `APPROVED` once all its items are approved.

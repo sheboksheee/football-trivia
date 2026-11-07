@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from 'react';
 import { DisplayName, isInviteCode } from '@ft/shared';
-import { useI18n } from '../i18n.js';
+import { ERROR_TEXT, useI18n } from '../i18n.js';
 import { client } from '../net/client.js';
 
 const NAME_KEY = 'ft.name';
@@ -32,10 +32,9 @@ export function Entry({
     e.preventDefault();
     setErr(null);
     const n = DisplayName.safeParse(name);
-    if (!n.success) return setErr(n.error.issues[0]?.message ?? 'Invalid name');
+    if (!n.success) return setErr(t('badName'));
     const c = code.trim().toUpperCase();
-    if (mode === 'join' && !isInviteCode(c))
-      return setErr('Codes are 6 letters/numbers (no 0, O, 1, I or L)');
+    if (mode === 'join' && !isInviteCode(c)) return setErr(t('badCode'));
     setBusy(true);
     try {
       localStorage.setItem(NAME_KEY, n.data);
@@ -49,20 +48,30 @@ export function Entry({
           ? await client.send({ type: 'room.create', payload: { displayName: n.data, locale } })
           : await client.send({ type: 'room.join', payload: { code: c, displayName: n.data, role } });
       if (!ack.ok) {
-        setErr(ack.error?.message ?? t('error'));
+        const code = ack.error?.code;
+        setErr(
+          (code && ERROR_TEXT[locale][code]) ||
+            (locale === 'en' ? ack.error?.message : null) ||
+            t('err_generic'),
+        );
         return;
       }
-      const room = client.snap.roomCode;
-      go(`#/room/${room}`);
+      go(`#/room/${client.snap.roomCode}`);
     } catch {
-      setErr('Cannot reach the server. Check your connection and try again.');
+      setErr(t('noServer'));
     } finally {
       setBusy(false);
     }
   };
 
+  const roleHint =
+    role === 'JUDGE'
+      ? t('roleHintJudge')
+      : role === 'SPECTATOR'
+        ? t('roleHintSpectator')
+        : t('roleHintPlayer');
   return (
-    <form className="card stack" style={{ maxWidth: 480, margin: '0 auto' }} onSubmit={submit} noValidate>
+    <form className="card stack entry-card" onSubmit={submit} noValidate>
       <h1 className="display h2">{mode === 'create' ? t('playNow') : t('joinWithCode')}</h1>
       <div className="field">
         <label className="label" htmlFor="name">
@@ -71,6 +80,7 @@ export function Entry({
         <input
           id="name"
           className="input"
+          dir="auto"
           value={name}
           maxLength={24}
           autoComplete="nickname"
@@ -87,6 +97,7 @@ export function Entry({
             <input
               id="code"
               className="input code"
+              dir="ltr"
               value={code}
               maxLength={6}
               inputMode="text"
@@ -108,13 +119,7 @@ export function Entry({
                 </button>
               ))}
             </div>
-            <span className="small muted">
-              {role === 'JUDGE'
-                ? 'Neutral referee: rules on spoken answers and appeals. Judges never play.'
-                : role === 'SPECTATOR'
-                  ? 'Watch the public game. Answers, votes and secret roles stay hidden.'
-                  : 'Compete for the Match Night title (2–6 players).'}
-            </span>
+            <span className="small muted">{roleHint}</span>
           </div>
         </>
       )}

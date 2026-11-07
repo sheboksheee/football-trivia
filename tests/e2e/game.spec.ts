@@ -1,7 +1,9 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
-async function player(browser: Browser, width = 390, height = 844) {
+async function player(browser: Browser, width = 390, height = 844, locale: 'en' | 'ar' = 'en') {
   const ctx = await browser.newContext({ viewport: { width, height } });
+  // Arabic is the app default; English-language tests pin the locale explicitly.
+  await ctx.addInitScript((l) => localStorage.setItem('ft.locale', l), locale);
   return ctx.newPage();
 }
 
@@ -63,23 +65,61 @@ test('host can reload and resume the same seat (rotating token)', async ({ brows
   await expect(host.getByText('HOST')).toBeVisible();
 });
 
-test('Arabic RTL at 360px: dir switches and no horizontal page scroll', async ({ browser }) => {
-  const page = await player(browser, 360, 740);
+test('Egyptian Arabic is the default; RTL at 360px with no horizontal scroll; toggle to English', async ({
+  browser,
+}) => {
+  const ctx = await browser.newContext({ viewport: { width: 360, height: 740 } });
+  const page = await ctx.newPage();
   await page.goto('/');
-  await page.getByRole('button', { name: 'العربية' }).click();
   await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
-  await expect(page.getByRole('button', { name: 'إنشاء غرفة' })).toBeVisible();
-  for (const route of ['/', '/#/how', '/#/join']) {
+  await expect(page.getByRole('button', { name: 'اعمل أوضة' })).toBeVisible();
+  // Mode names are shown in Egyptian Arabic
+  for (const name of ['أكتر ولا أقل؟', 'خناقة الجرس', 'المندس', 'يا تصيب يا تخيب', 'التوب ٢٥'])
+    await expect(page.getByText(name).first()).toBeVisible();
+  for (const route of ['/', '/#/how', '/#/join', '/#/create']) {
     await page.goto(route);
     const overflow = await page.evaluate(
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow).toBeLessThanOrEqual(0);
   }
+  await page.goto('/');
+  await page.getByRole('button', { name: 'English' }).click();
+  await expect(page.locator('html')).toHaveAttribute('dir', 'ltr');
+  await expect(page.getByRole('button', { name: 'Create room' })).toBeVisible();
+});
+
+test('a full Arabic game on phone + laptop', async ({ browser }) => {
+  const laptop = await player(browser, 1440, 900, 'ar');
+  const phone = await player(browser, 390, 844, 'ar');
+  await laptop.goto('/#/create');
+  await laptop.getByLabel('اسمك إيه؟').fill('شيكابالا');
+  await laptop.getByRole('button', { name: 'يلا نعمل الأوضة' }).click();
+  await expect(laptop.locator('.bigcode')).toBeVisible();
+  const code = (await laptop.locator('.bigcode').textContent())!.trim();
+  await phone.goto(`/#/join/${code}`);
+  await phone.getByLabel('اسمك إيه؟').fill('أبو تريكة');
+  await phone.getByRole('button', { name: 'دخّلني' }).click();
+  await expect(phone.locator('.bigcode')).toBeVisible();
+  await laptop.getByRole('button', { name: /لعبة واحدة/ }).click();
+  await laptop.locator('.modecard', { hasText: 'أكتر ولا أقل؟' }).click();
+  await laptop.getByRole('button', { name: 'احفظ البرنامج' }).click();
+  await laptop.getByRole('button', { name: /أنا جاهز/ }).click();
+  await phone.getByRole('button', { name: /أنا جاهز/ }).click();
+  await laptop.getByRole('button', { name: 'صفّارة البداية' }).click();
+  for (let q = 0; q < 5; q++) {
+    await expect(laptop.getByRole('button', { name: /B أكتر/ })).toBeEnabled({ timeout: 15_000 });
+    await laptop.getByRole('button', { name: /B أكتر/ }).click();
+    await phone.getByRole('button', { name: /B أقل/ }).click();
+    await expect(laptop.getByText(/اعترض/).first()).toBeVisible();
+  }
+  await expect(phone.getByText('نقط كل لعبة')).toBeVisible({ timeout: 30_000 });
+  await expect(laptop.getByText(/البطل|أبطال بالمشاركة/).first()).toBeVisible();
 });
 
 test('keyboard-only room creation and reduced motion', async ({ browser }) => {
   const ctx = await browser.newContext({ viewport: { width: 1024, height: 768 }, reducedMotion: 'reduce' });
+  await ctx.addInitScript(() => localStorage.setItem('ft.locale', 'en'));
   const page = await ctx.newPage();
   await page.goto('/#/create');
   await page.getByLabel('Your name').focus();
@@ -96,6 +136,7 @@ test('keyboard-only room creation and reduced motion', async ({ browser }) => {
 });
 
 test('admin studio: token required, quarantine and rights-blocked items visible', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('ft.locale', 'en'));
   await page.goto('/#/admin');
   await page.getByLabel('Admin token').fill('wrong');
   await page.getByRole('button', { name: 'Sign in' }).click();
