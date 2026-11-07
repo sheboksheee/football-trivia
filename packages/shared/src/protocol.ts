@@ -39,7 +39,7 @@ export const ClientCommand = z.discriminatedUnion('type', [
   cmd(
     'room.configure',
     z.object({
-      preset: z.enum(['QUICK', 'CLASSIC', 'MARATHON', 'CUSTOM']),
+      preset: z.enum(['SINGLE', 'QUICK', 'CLASSIC', 'MARATHON', 'CUSTOM']),
       modes: z.array(ModeKeySchema).min(1).max(12),
       coHostId: z.string().max(64).nullable().optional(),
     }),
