@@ -1,0 +1,21 @@
+# One-click demo deployment on Render (https://render.com).
+# Demo mode: in-memory storage (rooms reset on restart) and the fictional dev question bank.
+services:
+  - type: web
+    name: football-trivia
+    runtime: node
+    plan: free
+    buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @ft/web build && pnpm --filter @ft/server build
+    startCommand: node apps/server/dist/main.js
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: WEB_DIST
+        value: apps/web/dist
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: LOG_LEVEL
+        value: info

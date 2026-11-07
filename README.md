@@ -2,6 +2,8 @@
 
 Mobile-first multiplayer football trivia: private rooms for 2–6 players, unlimited spectators, an optional neutral judge, 11 playable modes and a **Match Night** championship with exact-fraction placement points.
 
+**Try it online in one click:** [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/sheboksheee/football-trivia) — free demo instance (in-memory: rooms reset when it restarts/sleeps). The admin token is in Render → your service → Environment → `ADMIN_TOKEN`.
+
 > **Data notice.** No licensed football data provider is integrated yet. All questions come from a **deterministically generated fictional league** ("Synthetic Dev League") so the game is fully playable without inventing real-world facts. See `docs/DATA_SOURCES.md` and `docs/DECISIONS.md`.
 
 Status, evidence and blockers: **`docs/BUILD_STATUS.md`**. Rule decisions (approved vs proposed): **`docs/DECISIONS.md`**.
