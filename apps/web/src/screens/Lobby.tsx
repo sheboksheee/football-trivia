@@ -32,7 +32,10 @@ export function Lobby({ view }: { view: RoomView }) {
   const [preset, setPreset] = useState<Preset>(view.room.playlist.preset as Preset);
   const [modes, setModes] = useState<ModeKey[]>(view.room.playlist.modes);
   const [copied, setCopied] = useState(false);
-  const [availability, setAvailability] = useState<Record<string, { published: number }> | null>(null);
+  const [availability, setAvailability] = useState<Record<
+    string,
+    { published: number; needed?: Record<number, number> }
+  > | null>(null);
   const dirty = preset !== view.room.playlist.preset || modes.join() !== view.room.playlist.modes.join();
 
   useEffect(() => {
@@ -139,6 +142,8 @@ export function Lobby({ view }: { view: RoomView }) {
               const order = modes.indexOf(k);
               const blocked = m.rulesStatus === 'BLOCKED';
               const published = availability?.[k]?.published;
+              const need = availability?.[k]?.needed?.[Math.min(6, Math.max(2, players.length))];
+              const noContent = published !== undefined && need !== undefined && published < need;
               const tooFew = players.length < m.minPlayers;
               const noJudge = m.judge === 'required' && judges.length === 0;
               if (!isHost && order < 0) return null;
@@ -147,7 +152,7 @@ export function Lobby({ view }: { view: RoomView }) {
                   key={k}
                   className="modecard"
                   aria-pressed={order >= 0}
-                  disabled={!isHost || blocked}
+                  disabled={!isHost || blocked || (noContent && order < 0)}
                   onClick={() => toggle(k)}
                   title={blocked ? c.blockers.join(' ') : c.rules}
                 >
@@ -172,9 +177,7 @@ export function Lobby({ view }: { view: RoomView }) {
                         {t('playersMin', { n: m.minPlayers })}
                       </span>
                     )}
-                    {published !== undefined && !blocked && published < 5 && (
-                      <span className="badge warn">{t('itemsCount', { n: published })}</span>
-                    )}
+                    {!blocked && noContent && <span className="badge bad">{t('noQuestions')}</span>}
                   </span>
                 </button>
               );

@@ -101,6 +101,7 @@ export type ErrorCode =
   | 'DEADLINE_PASSED'
   | 'DUPLICATE'
   | 'CONFLICT_OF_INTEREST'
+  | 'NO_CONTENT'
   | 'INTERNAL';
 
 export interface AckMessage {

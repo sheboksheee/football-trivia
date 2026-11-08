@@ -23,6 +23,7 @@ import {
 } from '@ft/game-rules';
 import type { Persistence } from './persistence.js';
 import type { ContentService } from './contentService.js';
+import { ReviewError } from '@ft/content';
 import type { Logger } from './logger.js';
 import { KeyedLimiter, type TokenBucket } from './rateLimit.js';
 import type { Metrics } from './metrics.js';
@@ -202,12 +203,19 @@ export class RoomManager {
     if (cmd.type === 'room.start') {
       validateStart(room.state, conn.memberId);
       const players = activeMembers(room.state).filter((m) => m.role === 'PLAYER').length;
-      const drawn = this.o.content.drawForMatch(
-        room.state.playlist.modes,
-        players,
-        room.state.seed,
-        room.usedQuestions,
-      );
+      let drawn: ReturnType<ContentService['drawForMatch']>;
+      try {
+        drawn = this.o.content.drawForMatch(
+          room.state.playlist.modes,
+          players,
+          room.state.seed,
+          room.usedQuestions,
+        );
+      } catch (e) {
+        if (e instanceof ReviewError)
+          throw new GameError('NO_CONTENT', 'Not enough approved questions for one of the selected modes');
+        throw e;
+      }
       event = {
         type: 'start',
         at,

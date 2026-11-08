@@ -209,4 +209,18 @@ describe('server integration over WebSocket', () => {
     });
     expect(((await retire.json()) as any).question.status).toBe('RETIRED');
   });
+  it('starting a mode with no approved questions returns NO_CONTENT (not an internal error)', async () => {
+    const top = app.content.bank
+      .all()
+      .filter((q) => q.kind === 'top25' && q.status === 'PUBLISHED')
+      .map((q) => q.id);
+    await app.content.bulkReview(top, 'RETIRE', 'test', 'simulate an empty bank');
+    expect((app.content.availability() as any).top25.published).toBe(0);
+    const { host, others } = await lobby(2);
+    await host.send({ type: 'room.configure', payload: { preset: 'SINGLE', modes: ['top25'] } });
+    for (const c of [host, ...others]) await c.send({ type: 'room.ready', payload: { ready: true } });
+    const ack = await host.send({ type: 'room.start', payload: {} });
+    expect(ack.error.code).toBe('NO_CONTENT');
+    await app.content.bulkReview(top, 'RESTORE', 'test', 'undo');
+  });
 });

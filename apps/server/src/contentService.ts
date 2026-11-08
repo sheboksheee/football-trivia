@@ -181,13 +181,15 @@ export class ContentService {
     return shuffle([...real, ...rest], rng);
   }
 
-  availability(): Record<string, { published: number }> {
+  /** Published, playable questions per mode, and how many a game needs for 2–6 players. */
+  availability(): Record<string, { published: number; needed: Record<number, number> }> {
     const pub = this.bank.all().filter((q) => q.status === 'PUBLISHED' && this.allowedForPlay(q));
     return Object.fromEntries(
       Object.values(MODES).map((m) => {
-        if (m.rulesStatus === 'BLOCKED') return [m.key, { published: 0 }];
-        const kind = engineFor(m.key).contentKind;
-        return [m.key, { published: pub.filter((q) => q.kind === kind).length }];
+        if (m.rulesStatus === 'BLOCKED') return [m.key, { published: 0, needed: {} }];
+        const engine = engineFor(m.key);
+        const needed = Object.fromEntries([2, 3, 4, 5, 6].map((n) => [n, engine.itemsNeeded(n)]));
+        return [m.key, { published: pub.filter((q) => q.kind === engine.contentKind).length, needed }];
       }),
     );
   }
