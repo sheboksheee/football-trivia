@@ -21,3 +21,6 @@ services:
         generateValue: true
       - key: LOG_LEVEL
         value: info
+      # Optional: your football-data.org token. Render asks for it in the dashboard; never commit it.
+      - key: FOOTBALL_DATA_API_KEY
+        sync: false

@@ -13,7 +13,7 @@ d('PostgreSQL persistence (requires TEST_DATABASE_URL)', () => {
   it('migrations apply once and are idempotent', async () => {
     const pool = new pg.Pool({ connectionString: url });
     await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
-    expect(await migrate(pool)).toEqual(['001_init.sql']);
+    expect(await migrate(pool)).toEqual(['001_init.sql', '002_snapshot_types.sql']);
     expect(await migrate(pool)).toEqual([]);
     await pool.end();
   });

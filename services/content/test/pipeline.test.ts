@@ -32,12 +32,12 @@ describe('fixture provenance', () => {
     expect(a.map((s) => s.hash)).toEqual(b.map((s) => s.hash));
     expect(a.every((s) => /^[0-9a-f]{64}$/.test(s.hash))).toBe(true);
   });
-  it('real-world providers are candidates only: pending license, not integrated', () => {
+  it('real-world providers start with a PENDING license and are never auto-approved', () => {
     const real = SOURCES.filter((s) => s.kind !== 'SYNTHETIC_FIXTURE');
     expect(real.length).toBeGreaterThan(5);
-    expect(real.every((s) => s.licenseStatus === 'PENDING' && !s.integrated && !s.autoApproveEligible)).toBe(
-      true,
-    );
+    expect(real.every((s) => s.licenseStatus === 'PENDING' && !s.autoApproveEligible)).toBe(true);
+    // Only football-data.org is integrated; the rest remain candidates.
+    expect(real.filter((s) => s.integrated).map((s) => s.id)).toEqual(['src_football_data_org']);
   });
   it('adapter contract returns NOT_SUPPORTED explicitly', async () => {
     const ad = syntheticAdapter();

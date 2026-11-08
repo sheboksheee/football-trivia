@@ -10,3 +10,5 @@ export * from './pipeline.js';
 export * from './syntheticAdapter.js';
 export type { Candidate } from './generators/index.js';
 export { generateCandidates } from './generators/index.js';
+export * from './providers/footballData.js';
+export * from './providers/footballDataContent.js';

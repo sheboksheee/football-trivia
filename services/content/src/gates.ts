@@ -1,7 +1,14 @@
 import { normalizeAnswer } from '@ft/shared';
 import type { Candidate } from './generators/index.js';
 import type { GateResult, QuestionStatus } from './model.js';
-import type { KnowledgeBase } from './normalize.js';
+import type { Entity, Fact, RawSnapshot } from './model.js';
+
+/** The minimal knowledge-base surface the gates need (fixture and provider KBs both satisfy it). */
+export interface GateKB {
+  factIndex: Map<string, Fact>;
+  snapshots: Map<string, RawSnapshot>;
+  entities: Map<string, Entity>;
+}
 import { sourceById } from './sources.js';
 
 const ok = (gate: GateResult['gate'], message: string): GateResult => ({
@@ -21,7 +28,7 @@ const fail = (gate: GateResult['gate'], failureStatus: QuestionStatus, message: 
  * Mandatory publication gates (CONTENT_ENGINE.md, Blueprint B3). Order matters only for the
  * reported primary failure; every gate is always evaluated and recorded.
  */
-export function runGates(c: Candidate, kb: KnowledgeBase, seenFingerprints: Set<string>): GateResult[] {
+export function runGates(c: Candidate, kb: GateKB, seenFingerprints: Set<string>): GateResult[] {
   const gates: GateResult[] = [];
   const facts = c.factIds.map((id) => kb.factIndex.get(id));
   // EVIDENCE: every supporting fact exists, links to an immutable snapshot, and is fully scoped.

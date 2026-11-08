@@ -8,12 +8,12 @@ pnpm install
 pnpm typecheck          # strict TS, 0 errors
 pnpm lint               # eslint, 0 problems
 pnpm format:check       # prettier
-TEST_DATABASE_URL=postgresql://ft:ft@localhost:5432/football_trivia_test pnpm test   # 117 tests, 11 files
+TEST_DATABASE_URL=postgresql://ft:ft@localhost:5432/football_trivia_test pnpm test   # 129 tests, 13 files
 pnpm build              # web PWA + bundled server
 pnpm test:e2e           # Playwright, 6 browser tests (incl. a full Arabic game on phone + laptop) (starts its own server)
 FT_URL=ws://localhost:8787/ws SPECTATORS=300 pnpm --filter @ft/load test   # against a running server
 ```
-Without `TEST_DATABASE_URL` the 2 PostgreSQL tests are skipped (115 run).
+Without `TEST_DATABASE_URL` the 2 PostgreSQL tests are skipped (127 run).
 
 ## Phase checklist
 | Phase | State | Evidence |
@@ -43,7 +43,7 @@ Without `TEST_DATABASE_URL` the 2 PostgreSQL tests are skipped (115 run).
 1. **Who Am I? rules** (timing, input type, wrong answers, ties).
 2. **Approve or change every PROPOSED item** in `docs/DECISIONS.md` (8 modes are "Provisional").
 3. **TOP 25 tie rule** and **Pass & Play** scope.
-4. **Licensed football data**: choose a provider and confirm commercial redistribution rights. Until then the game runs only on the fictional dev league; no real-world question exists.
+4. **Licensed football data**: football-data.org is integrated (results, tables, venues → Higher or Lower, Who came first, Guess the Match, MCQ, Buzzer). Needs: your API token (`FOOTBALL_DATA_API_KEY`), a license decision in the Content Studio, your approval of the generated questions, and written confirmation of commercial use before a public launch. Player-level modes (Missing XI, Impostor, TOP 25, Auction, Connections) need the paid plan.
 5. Production decisions: hosting/provider, staff authentication for the Content Studio, privacy policy & data retention, font hosting, Arabic translation review.
 
 ## Known limitations / next engineering tasks

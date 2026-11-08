@@ -19,7 +19,43 @@ const Env = z.object({
     .enum(['true', 'false'])
     .default('false')
     .transform((v) => v === 'true'),
+  /** football-data.org token (server-side only). */
+  FOOTBALL_DATA_API_KEY: z.string().optional(),
+  /** Enable ingestion even without a token here (e.g. a proxy injects the X-Auth-Token header). */
+  FOOTBALL_DATA_ENABLED: z
+    .enum(['true', 'false'])
+    .optional()
+    .transform((v) => v === 'true'),
+  /** Comma-separated competition codes. Defaults to the five big free-plan leagues. */
+  FOOTBALL_DATA_COMPETITIONS: z.string().default('PL,PD,SA,BL1,FL1'),
+  /** Comma-separated season start years. Defaults to the last three completed seasons + current. */
+  FOOTBALL_DATA_SEASONS: z.string().optional(),
+  /** Fetch automatically at boot when enabled. */
+  FOOTBALL_DATA_AUTO_INGEST: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
 });
+
+/** Season start years: current season (started in August or later) plus the three before it. */
+export function defaultSeasons(today = new Date()): number[] {
+  const y = today.getUTCFullYear();
+  const current = today.getUTCMonth() >= 6 ? y : y - 1;
+  return [current - 3, current - 2, current - 1, current];
+}
+
+export function footballDataSettings(c: Config) {
+  const enabled = !!c.FOOTBALL_DATA_API_KEY || !!c.FOOTBALL_DATA_ENABLED;
+  const seasons = c.FOOTBALL_DATA_SEASONS
+    ? c.FOOTBALL_DATA_SEASONS.split(',')
+        .map((x) => Number(x.trim()))
+        .filter((x) => Number.isInteger(x) && x > 1900)
+    : defaultSeasons();
+  const competitions = c.FOOTBALL_DATA_COMPETITIONS.split(',')
+    .map((x) => x.trim().toUpperCase())
+    .filter(Boolean);
+  return { enabled, token: c.FOOTBALL_DATA_API_KEY || undefined, competitions, seasons };
+}
 
 export type Config = z.infer<typeof Env> & { production: boolean };
 

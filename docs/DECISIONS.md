@@ -18,7 +18,7 @@ Legend: **APPROVED** = user-confirmed (authoritative). **PROPOSED** = chosen by 
 | In-game kick voting policy | "eligible-majority approval" undefined. | Host can remove spectators in-game and anyone in the lobby; in-game participant kicks are refused with an explanation. |
 | Emergency-pause limits/abuse policy | GDD §16. | Unlimited, host-only, reason required, fully audited. |
 | Neutral-judge policy for 2-player rooms | GDD §16. | Judge must join as a separate non-playing member. |
-| Licensed data provider | Commercial rights unverified. | Only a fictional fixture is integrated (see Content). |
+| Licensed data provider | football-data.org integrated (free plan) but its commercial-use terms are not published; needs written confirmation. | License PENDING by default; owner can mark it *Private testing* (demo/dev play) or *Commercial* (required for production) in the Content Studio. Player-level questions need the paid plan. |
 
 ## PROPOSED — gameplay parameters awaiting approval
 

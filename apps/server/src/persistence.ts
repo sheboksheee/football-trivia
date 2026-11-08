@@ -38,6 +38,8 @@ export interface Persistence {
   // content
   saveSources(s: SourceRecord[]): Promise<void>;
   saveSnapshots(s: RawSnapshot[]): Promise<void>;
+  loadSnapshots(sourceId: string): Promise<RawSnapshot[]>;
+  loadSources(): Promise<SourceRecord[]>;
   loadQuestions(): Promise<Map<string, Question>>;
   saveQuestions(q: Question[]): Promise<void>;
   close(): Promise<void>;
@@ -108,8 +110,20 @@ export class MemoryPersistence implements Persistence {
         sessions: [...r.sessions].map(([memberId, tokenHash]) => ({ memberId, tokenHash })),
       }));
   }
-  async saveSources() {}
-  async saveSnapshots() {}
+  sources = new Map<string, SourceRecord>();
+  snapshots = new Map<string, RawSnapshot>();
+  async saveSources(s: SourceRecord[]) {
+    for (const x of s) this.sources.set(x.id, structuredClone(x));
+  }
+  async saveSnapshots(s: RawSnapshot[]) {
+    for (const x of s) if (!this.snapshots.has(x.id)) this.snapshots.set(x.id, x);
+  }
+  async loadSnapshots(sourceId: string) {
+    return [...this.snapshots.values()].filter((x) => x.sourceId === sourceId);
+  }
+  async loadSources() {
+    return [...this.sources.values()].map((x) => structuredClone(x));
+  }
   async loadQuestions() {
     return new Map(this.questions);
   }
@@ -269,15 +283,50 @@ export class PostgresPersistence implements Persistence {
       const part = s.slice(i, i + chunk);
       const values: unknown[] = [];
       const rows = part.map((x, k) => {
-        values.push(x.id, x.sourceId, x.hash, x.retrievedAt, JSON.stringify(x.payload));
-        const b = k * 5;
-        return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5})`;
+        values.push(
+          x.id,
+          x.sourceId,
+          x.hash,
+          x.retrievedAt,
+          JSON.stringify(x.payload),
+          x.recordType,
+          x.externalId,
+        );
+        const b = k * 7;
+        return `($${b + 1},$${b + 2},$${b + 3},$${b + 4},$${b + 5},$${b + 6},$${b + 7})`;
       });
       await this.pool.query(
-        `INSERT INTO raw_snapshots (id, source_id, hash, retrieved_at, payload) VALUES ${rows.join(',')} ON CONFLICT (id) DO NOTHING`,
+        `INSERT INTO raw_snapshots (id, source_id, hash, retrieved_at, payload, record_type, external_id) VALUES ${rows.join(',')} ON CONFLICT (id) DO NOTHING`,
         values,
       );
     }
+  }
+  async loadSnapshots(sourceId: string): Promise<RawSnapshot[]> {
+    const r = await this.pool.query<{
+      id: string;
+      source_id: string;
+      hash: string;
+      retrieved_at: Date;
+      payload: unknown;
+      record_type: string | null;
+      external_id: string | null;
+    }>(
+      'SELECT id, source_id, hash, retrieved_at, payload, record_type, external_id FROM raw_snapshots WHERE source_id=$1',
+      [sourceId],
+    );
+    return r.rows.map((x) => ({
+      id: x.id,
+      sourceId: x.source_id,
+      hash: x.hash,
+      retrievedAt: new Date(x.retrieved_at).toISOString(),
+      payload: x.payload,
+      recordType: x.record_type ?? '',
+      externalId: x.external_id ?? '',
+    }));
+  }
+  async loadSources(): Promise<SourceRecord[]> {
+    const r = await this.pool.query<{ payload: SourceRecord }>('SELECT payload FROM sources');
+    return r.rows.map((x) => x.payload);
   }
   async loadQuestions() {
     const r = await this.pool.query<{ payload: Question }>('SELECT payload FROM questions');

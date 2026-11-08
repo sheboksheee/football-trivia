@@ -194,16 +194,35 @@ function Queue({ api, onChange }: { api: ReturnType<typeof useAdmin>; onChange: 
   const [data, setData] = useState<any>(null);
   const [err, setErr] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
+  const [source, setSource] = useState('');
+  const [bulkNote, setBulkNote] = useState('');
+  const [bulkMsg, setBulkMsg] = useState<string | null>(null);
   const load = useCallback(() => {
     setData(null);
-    const p = new URLSearchParams({ limit: '50' });
+    const p = new URLSearchParams({ limit: '100' });
     if (status) p.set('status', status);
     if (kind) p.set('kind', kind);
     if (q) p.set('q', q);
+    if (source) p.set('source', source);
     api(`/questions?${p}`)
       .then(setData)
       .catch((e) => setErr(e.message));
-  }, [api, status, kind, q]);
+  }, [api, status, kind, q, source]);
+  const bulkApprove = async () => {
+    if (!data?.items?.length) return;
+    try {
+      const r = await api('/questions/bulk-review', {
+        method: 'POST',
+        body: JSON.stringify({ ids: data.items.map((x: any) => x.id), action: 'APPROVE', note: bulkNote }),
+      });
+      setBulkMsg(`Approved ${r.done}${r.failed.length ? `, ${r.failed.length} refused by gates` : ''}`);
+      setBulkNote('');
+      load();
+      onChange();
+    } catch (e) {
+      setBulkMsg((e as Error).message);
+    }
+  };
   useEffect(load, [load]);
   return (
     <section className="card stack">
@@ -232,6 +251,17 @@ function Queue({ api, onChange }: { api: ReturnType<typeof useAdmin>; onChange: 
             <option key={s}>{s}</option>
           ))}
         </select>
+        <select
+          className="select"
+          style={{ width: 'auto' }}
+          aria-label="Source"
+          value={source}
+          onChange={(e) => setSource(e.target.value)}
+        >
+          <option value="">All sources</option>
+          <option value="src_football_data_org">football-data.org (real)</option>
+          <option value="src_synthetic_dev_league">Fictional dev league</option>
+        </select>
         <input
           className="input"
           style={{ flex: 1, minWidth: 160 }}
@@ -257,6 +287,31 @@ function Queue({ api, onChange }: { api: ReturnType<typeof useAdmin>; onChange: 
           <p className="small muted" style={{ margin: 0 }}>
             {data.total} matching · showing {data.items.length}
           </p>
+          {status === 'NEEDS_REVIEW' && (
+            <div className="card tight stack" style={{ background: 'var(--bg-2)' }}>
+              <span className="small">
+                Approve all {data.items.length} shown questions at once. Each one is re-checked against every
+                gate and gets its own audit entry. Only do this after spot-checking a few against the source.
+              </span>
+              <div className="row">
+                <input
+                  className="input"
+                  style={{ flex: 1, minWidth: 200 }}
+                  placeholder="Review note (required)"
+                  value={bulkNote}
+                  onChange={(e) => setBulkNote(e.target.value)}
+                />
+                <button
+                  className="btn primary sm"
+                  disabled={bulkNote.trim().length < 3}
+                  onClick={bulkApprove}
+                >
+                  Approve {data.items.length} shown
+                </button>
+              </div>
+              {bulkMsg && <span className="small muted">{bulkMsg}</span>}
+            </div>
+          )}
           <ul className="list">
             {data.items.map((it: any) => (
               <li key={it.id}>
@@ -440,48 +495,192 @@ function Detail({
 
 function Sources({ api }: { api: ReturnType<typeof useAdmin> }) {
   const [s, setS] = useState<any[] | null>(null);
-  useEffect(() => {
+  const [fd, setFd] = useState<any>(null);
+  const load = useCallback(() => {
     api('/sources')
-      .then((r) => setS(r.sources))
+      .then((r) => {
+        setS(r.sources);
+        setFd(r.footballData);
+      })
       .catch(() => setS([]));
   }, [api]);
+  useEffect(load, [load]);
+  useEffect(() => {
+    if (!fd?.running) return;
+    const t = setInterval(load, 3000);
+    return () => clearInterval(t);
+  }, [fd?.running, load]);
   if (!s) return <Skeleton h={200} />;
+  const real = s.find((x) => x.id === 'src_football_data_org');
   return (
-    <section className="card">
-      <div className="table-wrap">
-        <table className="table">
-          <thead>
-            <tr>
-              <th>Source</th>
-              <th>Kind</th>
-              <th>License</th>
-              <th>Integrated</th>
-            </tr>
-          </thead>
-          <tbody>
-            {s.map((x) => (
-              <tr key={x.id}>
-                <td>
-                  <strong>{x.name}</strong>
-                  <div className="small muted">{x.notes}</div>
-                  {x.termsUrl && (
-                    <a className="small" href={x.termsUrl} target="_blank" rel="noreferrer noopener">
-                      {x.termsUrl}
-                    </a>
-                  )}
-                </td>
-                <td className="small">{x.kind}</td>
-                <td>
-                  <span className={`badge ${x.licenseStatus === 'APPROVED' ? 'ok' : 'warn'}`}>
-                    {x.licenseStatus}
-                  </span>
-                </td>
-                <td>{x.integrated ? 'yes' : 'no'}</td>
+    <div className="stack">
+      {real && <FootballDataPanel api={api} source={real} status={fd} onChange={load} />}
+      <section className="card">
+        <div className="table-wrap">
+          <table className="table">
+            <thead>
+              <tr>
+                <th>Source</th>
+                <th>Kind</th>
+                <th>License</th>
+                <th>Integrated</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {s.map((x) => (
+                <tr key={x.id}>
+                  <td>
+                    <strong>{x.name}</strong>
+                    <div className="small muted">{x.notes}</div>
+                    {x.termsUrl && (
+                      <a className="small" href={x.termsUrl} target="_blank" rel="noreferrer noopener">
+                        {x.termsUrl}
+                      </a>
+                    )}
+                  </td>
+                  <td className="small">{x.kind}</td>
+                  <td>
+                    <span className={`badge ${x.licenseStatus === 'APPROVED' ? 'ok' : 'warn'}`}>
+                      {x.licenseStatus}
+                    </span>
+                    {x.allowedUses?.length > 0 && (
+                      <div className="small muted">{x.allowedUses.join(', ')}</div>
+                    )}
+                  </td>
+                  <td>{x.integrated ? 'yes' : 'no'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+function FootballDataPanel({
+  api,
+  source,
+  status,
+  onChange,
+}: {
+  api: ReturnType<typeof useAdmin>;
+  source: any;
+  status: any;
+  onChange: () => void;
+}) {
+  const [decision, setDecision] = useState<'PENDING' | 'TESTING' | 'COMMERCIAL' | 'DENIED'>(
+    source.licenseStatus !== 'APPROVED'
+      ? source.licenseStatus
+      : source.allowedUses.includes('COMMERCIAL_REDISTRIBUTION')
+        ? 'COMMERCIAL'
+        : 'TESTING',
+  );
+  const [note, setNote] = useState('');
+  const [msg, setMsg] = useState<string | null>(null);
+  const save = async () => {
+    const body =
+      decision === 'TESTING'
+        ? { status: 'APPROVED', allowedUses: ['GAMEPLAY'] }
+        : decision === 'COMMERCIAL'
+          ? { status: 'APPROVED', allowedUses: ['GAMEPLAY', 'COMMERCIAL_REDISTRIBUTION'] }
+          : { status: decision, allowedUses: [] };
+    try {
+      await api(`/sources/${source.id}/license`, { method: 'POST', body: JSON.stringify({ ...body, note }) });
+      setMsg('Saved. Questions were re-checked against the new license.');
+      setNote('');
+      onChange();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  };
+  const ingest = async () => {
+    try {
+      await api('/football-data/ingest', { method: 'POST', body: '{}' });
+      onChange();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  };
+  const last = status?.lastReport;
+  return (
+    <section className="card stack">
+      <h2 className="display h3" style={{ margin: 0 }}>
+        football-data.org (real data)
+      </h2>
+      {!status?.enabled ? (
+        <Banner tone="warn">
+          Not connected on this server. Set <span className="mono">FOOTBALL_DATA_API_KEY</span> (your token
+          from football-data.org) in the server environment and restart.
+        </Banner>
+      ) : (
+        <div className="row small">
+          <span className={`badge ${status.running ? 'info' : 'ok'}`}>
+            {status.running ? 'Fetching…' : 'Idle'}
+          </span>
+          <span>{status.snapshots} stored responses</span>
+          <span className="muted">
+            {status.competitions.join(', ')} · seasons {status.seasons.join(', ')}
+          </span>
+          <span className="spacer" />
+          <button className="btn sm" disabled={status.running} onClick={ingest}>
+            Fetch missing data
+          </button>
+        </div>
+      )}
+      {last && (
+        <p className="small muted" style={{ margin: 0 }}>
+          Last run {status.lastRunAt?.slice(0, 16).replace('T', ' ')}: {last.added} new responses,{' '}
+          {last.calls} API calls
+          {last.skipped.length > 0 &&
+            ` · ${last.skipped.length} skipped (${[...new Set(last.skipped.map((x: any) => x.reason))].join(', ')})`}
+          {last.error && ` · error: ${last.error}`}
+        </p>
+      )}
+      <div className="field">
+        <span className="label">License decision (recorded with your note in an audit trail)</span>
+        <div className="seg" role="group" aria-label="License decision">
+          {(
+            [
+              ['PENDING', 'Pending'],
+              ['TESTING', 'Private testing'],
+              ['COMMERCIAL', 'Commercial (confirmed in writing)'],
+              ['DENIED', 'Denied'],
+            ] as const
+          ).map(([k, label]) => (
+            <button key={k} type="button" aria-pressed={decision === k} onClick={() => setDecision(k)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className="small muted">
+          Private testing lets approved questions be played in demo/dev servers. A production launch only uses
+          sources marked Commercial. Real questions always need your approval in the Questions tab — nothing
+          is auto-published.
+        </span>
       </div>
+      <div className="row">
+        <input
+          className="input"
+          style={{ flex: 1, minWidth: 200 }}
+          placeholder="Evidence / note (e.g. plan name, email confirmation)"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+        />
+        <button className="btn primary sm" disabled={note.trim().length < 3} onClick={save}>
+          Save license
+        </button>
+      </div>
+      {msg && <span className="small muted">{msg}</span>}
+      {source.licenseHistory?.length > 0 && (
+        <ul className="list small">
+          {source.licenseHistory.map((h: any, i: number) => (
+            <li key={i} className="muted">
+              {h.at.slice(0, 16).replace('T', ' ')} · {h.by} · {h.status} {h.allowedUses.join('+')} — {h.note}
+            </li>
+          ))}
+        </ul>
+      )}
     </section>
   );
 }

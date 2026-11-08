@@ -16,6 +16,14 @@ export interface SourceRecord {
   autoApproveEligible: boolean;
   integrated: boolean;
   notes: string;
+  /** Audited license decisions recorded by a human (never inferred). */
+  licenseHistory?: Array<{
+    at: string;
+    by: string;
+    status: LicenseStatus;
+    allowedUses: SourceRecord['allowedUses'];
+    note: string;
+  }>;
 }
 
 export interface RawSnapshot {

@@ -6,8 +6,8 @@ import { WebSocketServer, type WebSocket } from 'ws';
 import { z } from 'zod';
 import { MODES, PLAYABLE_MODE_KEYS, type ContentItem } from '@ft/shared';
 import { DEFAULT_TIMING, scaleTiming } from '@ft/game-rules';
-import { SOURCES, ReviewError } from '@ft/content';
-import type { Config } from './config.js';
+import { SOURCES, ReviewError, LicenseError, type FetchLike } from '@ft/content';
+import { footballDataSettings, type Config } from './config.js';
 import { createLogger, type Logger } from './logger.js';
 import { Metrics } from './metrics.js';
 import { MemoryPersistence, PostgresPersistence, type Persistence } from './persistence.js';
@@ -38,6 +38,18 @@ const MIME: Record<string, string> = {
   '.txt': 'text/plain',
 };
 
+const LicenseBody = z.object({
+  status: z.enum(['APPROVED', 'PENDING', 'DENIED']),
+  allowedUses: z.array(z.enum(['GAMEPLAY', 'COMMERCIAL_REDISTRIBUTION', 'RESEARCH_ONLY'])).max(3),
+  note: z.string().trim().min(3).max(1000),
+  reviewer: z.string().trim().min(1).max(64).default('admin'),
+});
+const BulkBody = z.object({
+  ids: z.array(z.string().max(80)).min(1).max(500),
+  action: z.enum(['APPROVE', 'REJECT', 'RETIRE', 'QUARANTINE', 'RESTORE']),
+  note: z.string().trim().min(3).max(1000),
+  reviewer: z.string().trim().min(1).max(64).default('admin'),
+});
 const ReviewBody = z.object({
   action: z.enum(['APPROVE', 'REJECT', 'RETIRE', 'QUARANTINE', 'RESTORE']),
   note: z.string().trim().min(3).max(1000),
@@ -46,7 +58,7 @@ const ReviewBody = z.object({
 
 export async function createApp(
   config: Config,
-  opts: { db?: Persistence; now?: () => number; log?: Logger } = {},
+  opts: { db?: Persistence; now?: () => number; log?: Logger; footballDataFetch?: FetchLike } = {},
 ): Promise<App> {
   const log = opts.log ?? createLogger(config.LOG_LEVEL);
   const metrics = new Metrics();
@@ -60,8 +72,24 @@ export async function createApp(
     : config.production && !config.DEMO_MODE;
   if (config.DEMO_MODE)
     log.warn('DEMO_MODE: in-memory rooms and the fictional development question bank. Not for real events.');
-  const content = new ContentService(db, log, strict);
+  const fd = footballDataSettings(config);
+  const requireCommercialRights = config.production && !config.DEMO_MODE;
+  const content = new ContentService(db, log, {
+    strict,
+    requireCommercialRights,
+    footballData: {
+      ...fd,
+      ...(opts.footballDataFetch ? { fetch: opts.footballDataFetch, minIntervalMs: 0 } : {}),
+    },
+  });
   await content.init();
+  if (fd.enabled && config.FOOTBALL_DATA_AUTO_INGEST) {
+    log.info(
+      { competitions: fd.competitions, seasons: fd.seasons },
+      'football-data.org: fetching missing records in the background',
+    );
+    content.startIngest();
+  }
   const timing =
     config.FT_TIME_SCALE === 1 ? DEFAULT_TIMING : scaleTiming(DEFAULT_TIMING, config.FT_TIME_SCALE);
   if (config.FT_TIME_SCALE !== 1)
@@ -148,7 +176,42 @@ export async function createApp(
           conflicts: content.result.conflicts.length,
           sources: SOURCES.length,
         });
-      if (path === '/api/admin/sources') return json(res, 200, { sources: SOURCES });
+      if (path === '/api/admin/sources' && req.method === 'GET')
+        return json(res, 200, { sources: SOURCES, footballData: content.ingestStatus() });
+      const lic = /^\/api\/admin\/sources\/([\w-]+)\/license$/.exec(path);
+      if (lic && req.method === 'POST') {
+        const body = LicenseBody.safeParse(await readBody(req).catch(() => null));
+        if (!body.success) return json(res, 400, { error: body.error.issues[0]?.message ?? 'Invalid body' });
+        try {
+          const source = await content.setLicense(lic[1]!, {
+            status: body.data.status,
+            allowedUses: body.data.allowedUses,
+            by: body.data.reviewer,
+            note: body.data.note,
+          });
+          return json(res, 200, { source, counts: content.bank.counts() });
+        } catch (e) {
+          if (e instanceof LicenseError) return json(res, 409, { error: e.message });
+          throw e;
+        }
+      }
+      if (path === '/api/admin/football-data/ingest' && req.method === 'POST') {
+        try {
+          const body = (await readBody(req).catch(() => ({}))) as { refresh?: boolean };
+          return json(res, 202, { footballData: content.startIngest({ refresh: body?.refresh === true }) });
+        } catch (e) {
+          return json(res, 409, { error: e instanceof Error ? e.message : 'Cannot ingest' });
+        }
+      }
+      if (path === '/api/admin/questions/bulk-review' && req.method === 'POST') {
+        const body = BulkBody.safeParse(await readBody(req).catch(() => null));
+        if (!body.success) return json(res, 400, { error: body.error.issues[0]?.message ?? 'Invalid body' });
+        return json(
+          res,
+          200,
+          await content.bulkReview(body.data.ids, body.data.action, body.data.reviewer, body.data.note),
+        );
+      }
       if (path === '/api/admin/conflicts') return json(res, 200, { conflicts: content.result.conflicts });
       if (path === '/api/admin/questions' && req.method === 'GET') {
         const status = url.searchParams.get('status');
@@ -158,6 +221,10 @@ export async function createApp(
         const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0));
         let list = bank.all();
         if (status) list = list.filter((x) => x.status === status);
+        const source = url.searchParams.get('source');
+        const template = url.searchParams.get('template');
+        if (source) list = list.filter((x) => x.sourceIds.includes(source));
+        if (template) list = list.filter((x) => x.template === template);
         if (kind) list = list.filter((x) => x.kind === kind);
         if (q)
           list = list.filter(
@@ -183,8 +250,11 @@ export async function createApp(
         if (!q) return json(res, 404, { error: 'Not found' });
         if (!m[2] && req.method === 'GET') {
           const facts = q.factIds.slice(0, 60).map((id) => {
-            const f = content.result.kb.factIndex.get(id);
-            const snap = f ? content.result.kb.snapshots.get(f.evidenceId) : undefined;
+            const f = content.result.kb.factIndex.get(id) ?? content.result.fdKb?.factIndex.get(id);
+            const snap = f
+              ? (content.result.kb.snapshots.get(f.evidenceId) ??
+                content.result.fdKb?.snapshots.get(f.evidenceId))
+              : undefined;
             return f
               ? {
                   ...f,

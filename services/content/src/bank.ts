@@ -106,9 +106,10 @@ export class QuestionBank {
     rng: () => number,
     exclude: Set<string> = new Set(),
     mix = DEFAULT_MIX,
+    allow: (q: Question) => boolean = () => true,
   ): ContentItem[] {
     const pool = shuffle(
-      this.all().filter((q) => q.kind === kind && q.status === 'PUBLISHED' && !exclude.has(q.id)),
+      this.all().filter((q) => q.kind === kind && q.status === 'PUBLISHED' && !exclude.has(q.id) && allow(q)),
       rng,
     );
     if (pool.length < count)

@@ -3,6 +3,7 @@ import type { SourceRecord } from './model.js';
 export const SYNTHETIC_SOURCE_ID = 'src_synthetic_dev_league';
 export const CROSSCHECK_SOURCE_ID = 'src_synthetic_crosscheck';
 export const PENDING_SOURCE_ID = 'src_synthetic_pending_rights';
+export const FOOTBALL_DATA_SOURCE_ID = 'src_football_data_org';
 
 /**
  * Source registry. Real-world providers are listed as CANDIDATES only (docs/DATA_SOURCES.md):
@@ -48,15 +49,23 @@ export const SOURCES: SourceRecord[] = [
     integrated: true,
     notes: 'Exercises the licensing gate: everything derived from it must be BLOCKED_RIGHTS.',
   },
+  {
+    id: FOOTBALL_DATA_SOURCE_ID,
+    name: 'football-data.org API v4',
+    kind: 'LICENSED_API',
+    // Starts PENDING: a human must record the license decision (Content Studio → Sources).
+    licenseStatus: 'PENDING',
+    allowedUses: [],
+    attribution: 'Football data provided by the Football-Data.org API',
+    termsUrl: 'https://www.football-data.org/pricing',
+    autoApproveEligible: false,
+    integrated: true,
+    notes:
+      'Free plan (verified on the pricing page, 2026-11-08): 12 competitions, results, fixtures, league tables, 10 calls/minute. Line-ups, scorers and squads need a paid plan. Commercial-use terms are not published online: confirm in writing before a public launch.',
+  },
   ...(
     [
       ['src_cand_sportmonks', 'Sportmonks Football API', 'LICENSED_API', 'https://www.sportmonks.com/'],
-      [
-        'src_cand_football_data_org',
-        'football-data.org v4',
-        'LICENSED_API',
-        'https://www.football-data.org/',
-      ],
       ['src_cand_api_football', 'API-Football (API-SPORTS)', 'LICENSED_API', 'https://www.api-football.com/'],
       ['src_cand_sportradar', 'Sportradar Soccer API', 'LICENSED_API', 'https://sportradar.com/'],
       ['src_cand_statsperform', 'Stats Perform / Opta', 'LICENSED_API', 'https://www.statsperform.com/'],
@@ -91,4 +100,58 @@ export const SOURCES: SourceRecord[] = [
 
 export function sourceById(id: string): SourceRecord | undefined {
   return SOURCES.find((s) => s.id === id);
+}
+
+export class LicenseError extends Error {}
+
+/**
+ * Records a human license decision for a source. Fictional fixtures cannot be changed here.
+ * GAMEPLAY lets questions be played; COMMERCIAL_REDISTRIBUTION is required for a public launch.
+ */
+export function setSourceLicense(
+  id: string,
+  decision: {
+    status: SourceRecord['licenseStatus'];
+    allowedUses: SourceRecord['allowedUses'];
+    by: string;
+    note: string;
+    at?: string;
+  },
+): SourceRecord {
+  const s = sourceById(id);
+  if (!s) throw new LicenseError('Unknown source');
+  if (s.kind === 'SYNTHETIC_FIXTURE') throw new LicenseError('Fixture sources are fixed');
+  if (!decision.note || decision.note.trim().length < 3)
+    throw new LicenseError('A note explaining the license evidence is required');
+  if (decision.status !== 'APPROVED' && decision.allowedUses.length > 0)
+    throw new LicenseError('Only an APPROVED license can grant uses');
+  if (decision.status === 'APPROVED' && !decision.allowedUses.includes('GAMEPLAY'))
+    throw new LicenseError('An approved license must at least allow GAMEPLAY');
+  s.licenseStatus = decision.status;
+  s.allowedUses = [...decision.allowedUses];
+  s.licenseHistory = [
+    ...(s.licenseHistory ?? []),
+    {
+      at: decision.at ?? new Date().toISOString(),
+      by: decision.by,
+      status: decision.status,
+      allowedUses: [...decision.allowedUses],
+      note: decision.note.trim(),
+    },
+  ];
+  return s;
+}
+
+/** Restores a persisted license state (from the database) at boot. */
+export function restoreSourceLicense(saved: SourceRecord): void {
+  const s = sourceById(saved.id);
+  if (!s || s.kind === 'SYNTHETIC_FIXTURE' || !saved.licenseHistory?.length) return;
+  s.licenseStatus = saved.licenseStatus;
+  s.allowedUses = [...saved.allowedUses];
+  s.licenseHistory = [...saved.licenseHistory];
+}
+
+export function hasCommercialRights(id: string): boolean {
+  const s = sourceById(id);
+  return !!s && s.licenseStatus === 'APPROVED' && s.allowedUses.includes('COMMERCIAL_REDISTRIBUTION');
 }
