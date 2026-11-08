@@ -15,7 +15,8 @@ import {
   type RawSnapshot,
 } from '../src/index.js';
 
-import { fakeApi, fakeClock } from './fdFake.js';
+import { fakeApi, fakeClock, seasonData } from './fdFake.js';
+import { snapshot, generateFootballDataCandidates } from '../src/index.js';
 
 async function ingest(seasons = [2024, 2025, 2026]) {
   const api = fakeApi();
@@ -70,6 +71,22 @@ describe('football-data.org client', () => {
     expect(r.calls).toBe(1);
     expect(r.skipped[0]!.reason).toBe('UNAUTHORIZED');
   });
+  it('reports network failures instead of crashing, and stops the run', async () => {
+    const f: FetchLike = async () => {
+      throw new TypeError('fetch failed', {
+        cause: new Error('getaddrinfo ENOTFOUND api.football-data.org'),
+      });
+    };
+    const r = await ingestFootballData(new FootballDataClient({ fetch: f, ...fakeClock() }), {
+      competitions: ['PL', 'PD'],
+      seasons: [2024],
+    });
+    expect(r.calls).toBe(1);
+    expect(r.skipped[0]).toMatchObject({
+      reason: 'NETWORK',
+      detail: 'getaddrinfo ENOTFOUND api.football-data.org',
+    });
+  });
   it('never re-fetches snapshots it already has', async () => {
     const { report } = await ingest([2025]);
     const api = fakeApi();
@@ -102,6 +119,37 @@ describe('football-data normalisation', () => {
     expect(kb.tables.find((t) => t.season === '2026/27')!.complete).toBe(false);
     expect(kb.teams.get('fd_team_9000')!.venue).toBe('Alder Park');
     expect(kb.facts.every((f) => kb.snapshots.has(f.evidenceId) && f.scope.cutoff)).toBe(true);
+  });
+  it('a finished season with an AWARDED match is complete, and affected table questions are flagged', () => {
+    const d = seasonData(2025, true);
+    const m0 = d.matches.matches[0] as any;
+    m0.status = 'AWARDED';
+    const awarded = [m0.homeTeam.id, m0.awayTeam.id];
+    for (const r of d.standings.standings[0]!.table as any[])
+      if (awarded.includes(r.team.id)) r.playedGames -= 1;
+    const at = '2026-11-08T00:00:00.000Z';
+    const snaps = (['matches', 'standings', 'teams'] as const).map((k) =>
+      snapshot(FOOTBALL_DATA_SOURCE_ID, `fd_${k}`, `FPL_2025`, d[k], at),
+    );
+    const kb = normalizeFootballData(snaps, '2026-11-08');
+    const table = kb.tables[0]!;
+    expect(table.complete).toBe(true);
+    expect(table.awardedTeams.sort()).toEqual(awarded.map((x: number) => `fd_team_${x}`).sort());
+    expect(kb.matches.some((m) => m.entityId === `fd_match_${m0.id}`)).toBe(false); // awarded result never used as a played score
+    const cands = generateFootballDataCandidates(kb, { today: '2026-11-08' });
+    const hl = cands.filter((c) => c.template.startsWith('fd.hl.'));
+    const flagged = hl.filter((c) => c.validators.some((v) => v.message.includes('awarded')));
+    expect(flagged.length).toBeGreaterThan(0);
+    expect(flagged.every((c) => c.entityIds.some((e) => table.awardedTeams.includes(e)))).toBe(true);
+    expect(
+      flagged.every(
+        (c) => c.validators.find((v) => v.message.includes('awarded'))!.failureStatus === 'NEEDS_REVIEW',
+      ),
+    ).toBe(true);
+    // Stadium questions always carry the "names can be outdated" review note
+    const venue = cands.filter((c) => c.template.includes('venue'));
+    expect(venue.length).toBeGreaterThan(0);
+    expect(venue.every((c) => c.validators.some((v) => v.message.startsWith('Stadium names')))).toBe(true);
   });
   it('records malformed payloads instead of trusting them', () => {
     const bad: RawSnapshot = {

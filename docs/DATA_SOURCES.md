@@ -7,6 +7,8 @@ Verified on the official site and docs (not assumed):
 - Without a token the API returns 403 with `X-Authenticated-Client: anonymous` (treated as missing/invalid key).
 - Attribution: "Football data provided by the Football-Data.org API" is shown with every question from it.
 - **Commercial use: no published terms found online.** The source starts as `PENDING`; the owner records the decision in the Content Studio (Private testing / Commercial / Denied) with an evidence note. Production (non-demo) servers only draw from sources marked Commercial.
+- **Live run (2026-11-08, free plan):** PL, PD, SA, BL1, FL1 × seasons 2023–2026 = 60 requests, 0 refused, 6.4 minutes; 129 clubs, 5,731 finished matches, 15 completed seasons → ~940 questions awaiting human review.
+- Data findings handled in code: (1) matches with status `AWARDED` (decided off the pitch) — the season counts as complete when every match is FINISHED or AWARDED, awarded results are never used as played scores, and table questions involving those teams carry a review warning; (2) stadium names can be outdated (e.g. Napoli's ground listed under its pre-2020 name), so every venue question carries a "confirm the current name" review note.
 - Implementation: `services/content/src/providers/footballData.ts` (client, rate limit, 429 back-off, immutable sha256 snapshots) and `footballDataContent.ts` (zod-validated payloads, completed seasons and FINISHED matches only, question templates). Real questions are never auto-published.
 
 

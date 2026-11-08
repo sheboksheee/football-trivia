@@ -54,8 +54,9 @@ export type FdResult =
   | {
       ok: false;
       status: number;
-      reason: 'NOT_IN_PLAN' | 'NOT_FOUND' | 'UNAUTHORIZED' | 'RATE_LIMITED' | 'ERROR';
+      reason: 'NOT_IN_PLAN' | 'NOT_FOUND' | 'UNAUTHORIZED' | 'RATE_LIMITED' | 'NETWORK' | 'ERROR';
       url: string;
+      detail?: string;
     };
 
 export class FootballDataClient {
@@ -81,7 +82,20 @@ export class FootballDataClient {
       if (wait > 0) await this.sleep(wait);
       this.last = this.now();
       this.calls.push(url);
-      const res = await this.f(url, { headers });
+      let res: Awaited<ReturnType<FetchLike>>;
+      try {
+        res = await this.f(url, { headers });
+      } catch (e) {
+        // DNS/TLS/connection failure: report it instead of crashing the ingestion run.
+        return {
+          ok: false,
+          status: 0,
+          reason: 'NETWORK',
+          url,
+          detail:
+            e instanceof Error ? (e.cause instanceof Error ? e.cause.message : e.message) : 'network error',
+        };
+      }
       if (res.status === 200) {
         const body = await res.json();
         return {
@@ -147,7 +161,7 @@ export class FootballDataClient {
 
 export interface IngestReport {
   snapshots: RawSnapshot[];
-  skipped: Array<{ url: string; status: number; reason: string }>;
+  skipped: Array<{ url: string; status: number; reason: string; detail?: string }>;
   calls: number;
 }
 
@@ -175,8 +189,14 @@ export async function ingestFootballData(
         const r = await client[kind](code, season);
         if (r.ok) out.push(r.snapshot);
         else {
-          skipped.push({ url: r.url, status: r.status, reason: r.reason });
-          if (r.reason === 'UNAUTHORIZED') return { snapshots: out, skipped, calls: client.calls.length };
+          skipped.push({
+            url: r.url,
+            status: r.status,
+            reason: r.reason,
+            ...(r.detail ? { detail: r.detail } : {}),
+          });
+          if (r.reason === 'UNAUTHORIZED' || r.reason === 'NETWORK')
+            return { snapshots: out, skipped, calls: client.calls.length };
           if (r.reason === 'NOT_IN_PLAN') break; // whole competition-season unavailable on this plan
         }
         opts.onProgress?.(`${code} ${season} ${kind}: ${r.ok ? 'ok' : r.reason}`);

@@ -101,6 +101,8 @@ export interface FdTable {
   season: string;
   cutoff: string;
   complete: boolean;
+  /** Teams involved in a match decided off the pitch (AWARDED); their table rows need a human check. */
+  awardedTeams: string[];
   rows: Array<{
     team: string;
     position: number;
@@ -118,6 +120,8 @@ export interface FdKB {
   matches: FdMatch[];
   tables: FdTable[];
   invalid: Array<{ snapshotId: string; error: string }>;
+  /** Per competition|season: total matches, completed (FINISHED or AWARDED), awarded team ids. */
+  seasonSummary: Map<string, { total: number; done: number; awardedTeams: Set<string> }>;
 }
 
 export function seasonLabel(start: string, end: string): string {
@@ -137,6 +141,7 @@ export function normalizeFootballData(snaps: RawSnapshot[], today: string): FdKB
     matches: [],
     tables: [],
     invalid: [],
+    seasonSummary: new Map(),
   };
   let n = 0;
   const fact = (
@@ -187,8 +192,8 @@ export function normalizeFootballData(snaps: RawSnapshot[], today: string): FdKB
   };
   const relevant = snaps.filter((s) => s.sourceId === FOOTBALL_DATA_SOURCE_ID);
   for (const s of relevant) kb.snapshots.set(s.id, s);
-  // Teams first (venues), then standings, then matches.
-  const order = ['fd_teams', 'fd_standings', 'fd_matches'];
+  // Teams first (venues), then matches (season completeness), then standings.
+  const order = ['fd_teams', 'fd_matches', 'fd_standings'];
   for (const s of [...relevant].sort((a, b) => order.indexOf(a.recordType) - order.indexOf(b.recordType))) {
     try {
       if (s.recordType === 'fd_teams') {
@@ -217,7 +222,13 @@ export function normalizeFootballData(snaps: RawSnapshot[], today: string): FdKB
         const played = total.table.map((r) => r.playedGames);
         const allPlayed =
           played.every((p) => p === played[0]) && (played[0] ?? 0) >= 2 * (total.table.length - 1);
-        const complete = d.season.endDate < today && allPlayed;
+        const summary = kb.seasonSummary.get(`${d.competition.code ?? d.competition.id}|${season}`);
+        const n = total.table.length;
+        // Complete = season over AND (every team played every game, OR every scheduled match is
+        // FINISHED/AWARDED). Awarded results are decided off the pitch; flagged for human review.
+        const allMatchesDone = !!summary && summary.total === n * (n - 1) && summary.done === summary.total;
+        const complete = d.season.endDate < today && (allPlayed || allMatchesDone);
+        const awardedTeams = summary ? [...summary.awardedTeams] : [];
         const scope = (def: string) => ({
           competition: d.competition.name,
           season,
@@ -256,11 +267,27 @@ export function normalizeFootballData(snaps: RawSnapshot[], today: string): FdKB
           season,
           cutoff: d.season.endDate,
           complete,
+          awardedTeams,
           rows,
         });
       } else if (s.recordType === 'fd_matches') {
         const d = MatchesResp.parse(s.payload);
         for (const m of d.matches) {
+          {
+            const fSeason = (s.payload as { filters?: { season?: string } }).filters?.season;
+            const label = m.season
+              ? seasonLabel(m.season.startDate, m.season.endDate)
+              : (fSeason ?? m.utcDate.slice(0, 4));
+            const key = `${d.competition.code ?? d.competition.id}|${label}`;
+            const sum = kb.seasonSummary.get(key) ?? { total: 0, done: 0, awardedTeams: new Set<string>() };
+            sum.total++;
+            if (m.status === 'FINISHED' || m.status === 'AWARDED') sum.done++;
+            if (m.status === 'AWARDED') {
+              if (m.homeTeam.id !== null) sum.awardedTeams.add(`fd_team_${m.homeTeam.id}`);
+              if (m.awayTeam.id !== null) sum.awardedTeams.add(`fd_team_${m.awayTeam.id}`);
+            }
+            kb.seasonSummary.set(key, sum);
+          }
           if (
             m.status !== 'FINISHED' ||
             m.homeTeam.id === null ||
@@ -361,6 +388,18 @@ export function generateFootballDataCandidates(kb: FdKB, o: FdGenOptions): Candi
   const age = (d: string) => clamp(((Number(o.today.slice(0, 4)) - Number(d.slice(0, 4))) / 10) * 100);
 
   // ---- final tables (complete league seasons only)
+  const awardedWarning = (t: FdTable, teams: string[]): GateResult[] => {
+    const hit = teams.filter((x) => t.awardedTeams.includes(x));
+    return hit.length
+      ? [
+          fail(
+            'TRUTH',
+            'NEEDS_REVIEW',
+            `Season includes an awarded (off-the-pitch) result for ${hit.map(name).join(', ')}: confirm table values with the official league table`,
+          ),
+        ]
+      : [];
+  };
   for (const t of kb.tables.filter((x) => x.complete && x.rows.length >= 4)) {
     const rows = [...t.rows].sort((a, b) => a.position - b.position);
     const champ = rows[0]!;
@@ -385,6 +424,10 @@ export function generateFootballDataCandidates(kb: FdKB, o: FdGenOptions): Candi
         uniqueTop && new Set(options.map((x) => x.label)).size === 4
           ? ok('DISTRACTORS', '4 real clubs from the same table; exactly one finished 1st')
           : fail('DISTRACTORS', 'REJECTED', 'Ambiguous first place or duplicate clubs'),
+        ...awardedWarning(
+          t,
+          opts.map((r) => r.team),
+        ),
       ],
       components: {
         rarity: 20,
@@ -419,6 +462,7 @@ export function generateFootballDataCandidates(kb: FdKB, o: FdGenOptions): Candi
             a[stat] !== b[stat]
               ? ok('MODE_VALIDATOR', 'Same table and definition; unequal values')
               : fail('MODE_VALIDATOR', 'REJECTED', 'Equal values cannot be compared'),
+            ...awardedWarning(t, [a.team, b.team]),
           ],
           components: {
             rarity: 50,
@@ -454,6 +498,12 @@ export function generateFootballDataCandidates(kb: FdKB, o: FdGenOptions): Candi
       entityIds: [t.entityId],
       fingerprint: fp(['fd_venue_sa', t.entityId]),
       validators: [
+        fail(
+          'CLUES',
+          'NEEDS_REVIEW',
+          'Stadium names in this source can be outdated (renames/sponsorship): confirm the current official name before approving',
+        ),
+
         unique
           ? ok('MODE_VALIDATOR', 'Venue belongs to exactly one club in the data')
           : fail('MODE_VALIDATOR', 'REJECTED', 'Venue shared by several clubs'),
@@ -489,6 +539,12 @@ export function generateFootballDataCandidates(kb: FdKB, o: FdGenOptions): Candi
         entityIds: opts.map((x) => x.entityId),
         fingerprint: fp(['fd_venue_mcq', t.entityId]),
         validators: [
+          fail(
+            'CLUES',
+            'NEEDS_REVIEW',
+            'Stadium names in this source can be outdated (renames/sponsorship): confirm the current official name before approving',
+          ),
+
           new Set(options.map((x) => x.label)).size === 4
             ? ok('DISTRACTORS', 'Each option is the ground of exactly one club')
             : fail('DISTRACTORS', 'REJECTED', 'Duplicate grounds'),

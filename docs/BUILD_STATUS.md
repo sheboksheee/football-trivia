@@ -43,7 +43,7 @@ Without `TEST_DATABASE_URL` the 2 PostgreSQL tests are skipped (127 run).
 1. **Who Am I? rules** (timing, input type, wrong answers, ties).
 2. **Approve or change every PROPOSED item** in `docs/DECISIONS.md` (8 modes are "Provisional").
 3. **TOP 25 tie rule** and **Pass & Play** scope.
-4. **Licensed football data**: football-data.org is integrated (results, tables, venues → Higher or Lower, Who came first, Guess the Match, MCQ, Buzzer). Needs: your API token (`FOOTBALL_DATA_API_KEY`), a license decision in the Content Studio, your approval of the generated questions, and written confirmation of commercial use before a public launch. Player-level modes (Missing XI, Impostor, TOP 25, Auction, Connections) need the paid plan.
+4. **Licensed football data**: football-data.org is integrated (results, tables, venues → Higher or Lower, Who came first, Guess the Match, MCQ, Buzzer). Verified live on 2026-11-08 (60/60 requests ok, ~940 real questions generated). Needs: the token on the deployed server (`FOOTBALL_DATA_API_KEY`), a license decision in the Content Studio, your approval of the generated questions, and written confirmation of commercial use before a public launch. Player-level modes (Missing XI, Impostor, TOP 25, Auction, Connections) need the paid plan.
 5. Production decisions: hosting/provider, staff authentication for the Content Studio, privacy policy & data retention, font hosting, Arabic translation review.
 
 ## Known limitations / next engineering tasks
