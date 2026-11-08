@@ -48,6 +48,7 @@ Without `TEST_DATABASE_URL` the 2 PostgreSQL tests are skipped (127 run).
 
 ## Known limitations / next engineering tasks
 - Single server process owns rooms (no horizontal scaling yet); in-memory apply then async Postgres append.
+- Render blueprint now provisions a FREE PostgreSQL (expires 30 days after creation, 14-day grace to upgrade). Verified locally: license, approvals and fetched responses survive a restart and fetching resumes where it stopped.
 - Content Studio has no editing of question wording (review actions only) and no exposure/calibration dashboards.
 - UI is fully Egyptian-Arabic by default (English toggle); the questions themselves are still English (fictional dataset) — Arabic question templates are next.
 - No in-game kick UI (lobby kick is a server command without UI), no chat/mute/report.
