@@ -572,13 +572,20 @@ function FootballDataPanel({
   status: any;
   onChange: () => void;
 }) {
-  const [decision, setDecision] = useState<'PENDING' | 'TESTING' | 'COMMERCIAL' | 'DENIED'>(
+  const current: 'PENDING' | 'TESTING' | 'COMMERCIAL' | 'DENIED' =
     source.licenseStatus !== 'APPROVED'
       ? source.licenseStatus
       : source.allowedUses.includes('COMMERCIAL_REDISTRIBUTION')
         ? 'COMMERCIAL'
-        : 'TESTING',
-  );
+        : 'TESTING';
+  const [decision, setDecision] = useState(current);
+  const LABEL = {
+    PENDING: 'Pending',
+    TESTING: 'Private testing',
+    COMMERCIAL: 'Commercial',
+    DENIED: 'Denied',
+  } as const;
+  const unchanged = decision === current;
   const [note, setNote] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
   const save = async () => {
@@ -683,10 +690,15 @@ function FootballDataPanel({
           value={note}
           onChange={(e) => setNote(e.target.value)}
         />
-        <button className="btn primary sm" disabled={note.trim().length < 3} onClick={save}>
-          Save license
+        <button className="btn primary sm" disabled={unchanged || note.trim().length < 3} onClick={save}>
+          {unchanged ? `Current: ${LABEL[current]}` : `Save as “${LABEL[decision]}”`}
         </button>
       </div>
+      {unchanged && (
+        <span className="small muted">
+          Pick a different decision above to change the license (currently {LABEL[current]}).
+        </span>
+      )}
       {msg && <span className="small muted">{msg}</span>}
       {source.licenseHistory?.length > 0 && (
         <ul className="list small">
