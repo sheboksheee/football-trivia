@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   FootballDataClient,
   ingestFootballData,
+  ingestPlan,
   normalizeFootballData,
   runPipeline,
   setSourceLicense,
@@ -31,11 +32,23 @@ describe('football-data.org client', () => {
     const { report, api, clock } = await ingest([2025]);
     expect(report.snapshots).toHaveLength(3);
     expect(api.seen.every((s) => s.headers['X-Auth-Token'] === 'test-token')).toBe(true);
-    expect(api.seen[0]!.url).toBe('https://api.football-data.org/v4/competitions/FPL/matches?season=2025');
+    expect(api.seen[0]!.url).toBe('https://api.football-data.org/v4/competitions/FPL/standings?season=2025');
     expect(clock.sleeps.filter((x) => x > 0).every((x) => x >= 6000)).toBe(true);
     expect(
       report.snapshots.every((s) => /^[0-9a-f]{64}$/.test(s.hash) && s.sourceId === FOOTBALL_DATA_SOURCE_ID),
     ).toBe(true);
+  });
+  it('fetches the most useful data first: newest seasons, tables and clubs before full match lists', () => {
+    const plan = ingestPlan(['PL', 'PD'], [2023, 2025, 2024]).map((x) => `${x.kind}:${x.code}:${x.season}`);
+    expect(plan.slice(0, 4)).toEqual([
+      'standings:PL:2024',
+      'teams:PL:2024',
+      'standings:PD:2024',
+      'teams:PD:2024',
+    ]);
+    expect(plan.indexOf('standings:PL:2025')).toBeGreaterThan(plan.indexOf('teams:PD:2023')); // current season last
+    expect(plan.indexOf('matches:PL:2024')).toBeGreaterThan(plan.indexOf('teams:PD:2025'));
+    expect(plan).toHaveLength(18);
   });
   it('waits for the documented reset header on 429 and retries', async () => {
     const api = fakeApi({ rateLimitOnce: true });
@@ -86,6 +99,19 @@ describe('football-data.org client', () => {
       reason: 'NETWORK',
       detail: 'getaddrinfo ENOTFOUND api.football-data.org',
     });
+  });
+  it('stops at once when the token was revoked (400 "Your API token is invalid.")', async () => {
+    const f: FetchLike = async () => ({
+      status: 400,
+      headers: { get: () => null },
+      json: async () => ({ message: 'Your API token is invalid.', errorCode: 400 }),
+    });
+    const r = await ingestFootballData(new FootballDataClient({ fetch: f, ...fakeClock() }), {
+      competitions: ['PL', 'PD'],
+      seasons: [2024, 2025],
+    });
+    expect(r.calls).toBe(1);
+    expect(r.skipped[0]).toMatchObject({ reason: 'UNAUTHORIZED', detail: 'Your API token is invalid.' });
   });
   it('never re-fetches snapshots it already has', async () => {
     const { report } = await ingest([2025]);

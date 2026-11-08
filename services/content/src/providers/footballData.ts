@@ -117,8 +117,18 @@ export class FootballDataClient {
       }
       // An anonymous 403 means the token is missing or invalid (observed: X-Authenticated-Client: anonymous).
       const anonymous = (res.headers.get('X-Authenticated-Client') ?? '').toLowerCase() === 'anonymous';
+      // A revoked/regenerated token is answered with 400 "Your API token is invalid." (observed live).
+      let message = '';
+      if (res.status === 400) {
+        try {
+          message = String(((await res.json()) as { message?: unknown })?.message ?? '');
+        } catch {
+          /* non-JSON body */
+        }
+      }
+      const badToken = res.status === 400 && /token/i.test(message);
       const reason =
-        res.status === 403 && anonymous
+        (res.status === 403 && anonymous) || badToken
           ? 'UNAUTHORIZED'
           : res.status === 403
             ? 'NOT_IN_PLAN'
@@ -129,7 +139,7 @@ export class FootballDataClient {
                 : res.status === 429
                   ? 'RATE_LIMITED'
                   : 'ERROR';
-      return { ok: false, status: res.status, reason, url };
+      return { ok: false, status: res.status, reason, url, ...(message ? { detail: message } : {}) };
     }
   }
 
@@ -169,6 +179,27 @@ export interface IngestReport {
  * Pulls matches, final standings and teams for each competition/season. Calls the API only for
  * records not already in `have` (immutable snapshots are never re-fetched unless `refresh`).
  */
+/**
+ * Fetch order, most useful first: the most recent completed seasons before older ones (current season
+ * last), and for each
+ * season the standings and teams (cheap, many questions) before the full match lists.
+ */
+export function ingestPlan(competitions: string[], seasons: number[]) {
+  // Newest first, except the newest one goes last: it is usually still in progress (fewer questions).
+  const desc = [...seasons].sort((a, b) => b - a);
+  const bySeason = desc.length > 1 ? [...desc.slice(1), desc[0]!] : desc;
+  const plan: Array<{ code: string; season: number; kind: 'matches' | 'standings' | 'teams' }> = [];
+  for (const kinds of [['standings', 'teams'], ['matches']] as const)
+    for (const season of bySeason)
+      for (const code of competitions) for (const kind of kinds) plan.push({ code, season, kind });
+  return plan;
+}
+
+/**
+ * Pulls standings, teams and matches for each competition/season. Calls the API only for records
+ * not already in `have` (immutable snapshots are never re-fetched unless `refresh`).
+ * `onSnapshot` fires after every stored response so callers can publish progress incrementally.
+ */
 export async function ingestFootballData(
   client: FootballDataClient,
   opts: {
@@ -177,31 +208,32 @@ export async function ingestFootballData(
     have?: Set<string>;
     refresh?: boolean;
     onProgress?: (msg: string) => void;
+    onSnapshot?: (s: RawSnapshot) => void | Promise<void>;
   },
 ): Promise<IngestReport> {
   const out: RawSnapshot[] = [];
   const skipped: IngestReport['skipped'] = [];
-  for (const code of opts.competitions) {
-    for (const season of opts.seasons) {
-      for (const kind of ['matches', 'standings', 'teams'] as const) {
-        const id = `snap_${FOOTBALL_DATA_SOURCE_ID}_fd_${kind}_${code}_${season}`;
-        if (!opts.refresh && opts.have?.has(id)) continue;
-        const r = await client[kind](code, season);
-        if (r.ok) out.push(r.snapshot);
-        else {
-          skipped.push({
-            url: r.url,
-            status: r.status,
-            reason: r.reason,
-            ...(r.detail ? { detail: r.detail } : {}),
-          });
-          if (r.reason === 'UNAUTHORIZED' || r.reason === 'NETWORK')
-            return { snapshots: out, skipped, calls: client.calls.length };
-          if (r.reason === 'NOT_IN_PLAN') break; // whole competition-season unavailable on this plan
-        }
-        opts.onProgress?.(`${code} ${season} ${kind}: ${r.ok ? 'ok' : r.reason}`);
-      }
+  const unavailable = new Set<string>();
+  for (const { code, season, kind } of ingestPlan(opts.competitions, opts.seasons)) {
+    if (unavailable.has(`${code}_${season}`)) continue;
+    const id = `snap_${FOOTBALL_DATA_SOURCE_ID}_fd_${kind}_${code}_${season}`;
+    if (!opts.refresh && opts.have?.has(id)) continue;
+    const r = await client[kind](code, season);
+    if (r.ok) {
+      out.push(r.snapshot);
+      await opts.onSnapshot?.(r.snapshot);
+    } else {
+      skipped.push({
+        url: r.url,
+        status: r.status,
+        reason: r.reason,
+        ...(r.detail ? { detail: r.detail } : {}),
+      });
+      if (r.reason === 'UNAUTHORIZED' || r.reason === 'NETWORK')
+        return { snapshots: out, skipped, calls: client.calls.length };
+      if (r.reason === 'NOT_IN_PLAN') unavailable.add(`${code}_${season}`); // whole competition-season unavailable
     }
+    opts.onProgress?.(`${code} ${season} ${kind}: ${r.ok ? 'ok' : r.reason}`);
   }
   return { snapshots: out, skipped, calls: client.calls.length };
 }

@@ -640,6 +640,19 @@ function FootballDataPanel({
           {last.error && ` · error: ${last.error}`}
         </p>
       )}
+      {last?.skipped?.some((x: any) => x.reason === 'UNAUTHORIZED') && (
+        <Banner tone="bad">
+          football-data.org rejected the API token (
+          {last.skipped.find((x: any) => x.reason === 'UNAUTHORIZED')?.detail ?? 'unauthorized'}). If you
+          generated a new token, update FOOTBALL_DATA_API_KEY on the server, restart it, then press “Fetch
+          missing data”.
+        </Banner>
+      )}
+      {last?.skipped?.some((x: any) => x.reason === 'NETWORK') && (
+        <Banner tone="bad">
+          The server could not reach api.football-data.org (network). Try again later.
+        </Banner>
+      )}
       <div className="field">
         <span className="label">License decision (recorded with your note in an audit trail)</span>
         <div className="seg" role="group" aria-label="License decision">

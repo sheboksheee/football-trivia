@@ -250,21 +250,28 @@ export class ContentService {
       ...(fd.minIntervalMs !== undefined ? { minIntervalMs: fd.minIntervalMs } : {}),
     });
     const have = new Set(this.fdSnapshots.map((s) => s.id));
+    // Publish progressively: store each response immediately and rebuild the bank every few
+    // responses, so the first real questions appear within about a minute instead of at the end.
+    let sinceRebuild = 0;
+    const absorb = async (snap: RawSnapshot) => {
+      await this.db.saveSnapshots([snap]);
+      this.fdSnapshots = [...this.fdSnapshots.filter((x) => x.id !== snap.id), snap];
+      this.ingest.snapshots = this.fdSnapshots.length;
+      if (++sinceRebuild >= 5) {
+        sinceRebuild = 0;
+        await this.rebuild();
+      }
+    };
     void ingestFootballData(client, {
       competitions: fd.competitions,
       seasons: fd.seasons,
       have,
       refresh: !!opts.refresh,
       onProgress: (msg) => this.log.info({ msg }, 'football-data ingest'),
+      onSnapshot: absorb,
     })
       .then(async (report) => {
-        if (report.snapshots.length) {
-          await this.db.saveSnapshots(report.snapshots);
-          const byId = new Map(this.fdSnapshots.map((s) => [s.id, s]));
-          for (const s of report.snapshots) byId.set(s.id, s);
-          this.fdSnapshots = [...byId.values()];
-          await this.rebuild();
-        }
+        if (sinceRebuild > 0) await this.rebuild();
         this.ingest.lastReport = {
           added: report.snapshots.length,
           skipped: report.skipped,
