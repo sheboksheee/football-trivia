@@ -81,11 +81,11 @@ export function Admin() {
   const login = (e: FormEvent) => {
     e.preventDefault();
     try {
-      sessionStorage.setItem(TOKEN_KEY, draft);
+      sessionStorage.setItem(TOKEN_KEY, draft.trim());
     } catch {
       /* ignore */
     }
-    setToken(draft);
+    setToken(draft.trim());
   };
 
   if (!token || authErr) {
@@ -93,8 +93,9 @@ export function Admin() {
       <form className="card stack" style={{ maxWidth: 460, margin: '0 auto' }} onSubmit={login}>
         <h1 className="display h2">Content studio</h1>
         <p className="muted" style={{ margin: 0 }}>
-          Review, publish and retire questions. Every decision is audited. Enter the server’s admin token
-          (ADMIN_TOKEN; in development it is printed in the server log).
+          Review, publish and retire questions. Every decision is audited. Enter the server’s admin token — on
+          Render: your service → Environment → ADMIN_TOKEN (click the eye icon); in local development it is
+          printed in the server log.
         </p>
         {authErr && <Banner tone="bad">{authErr}</Banner>}
         <div className="field">
