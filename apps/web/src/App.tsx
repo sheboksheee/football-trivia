@@ -61,7 +61,12 @@ export function App() {
       page = <HowToPlay />;
       break;
     case 'admin':
-      page = <Admin />;
+      // The Content Studio is an English staff tool: keep it left-to-right even when the game is in Arabic.
+      page = (
+        <div dir="ltr" lang="en">
+          <Admin />
+        </div>
+      );
       break;
     default:
       page = <Home go={go} />;

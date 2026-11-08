@@ -1,4 +1,4 @@
-import { createRng, MODES, type ContentItem, type McqItem, type ModeKey } from '@ft/shared';
+import { createRng, MODES, shuffle, type ContentItem, type McqItem, type ModeKey } from '@ft/shared';
 import {
   DEV_POLICY,
   FOOTBALL_DATA_SOURCE_ID,
@@ -148,17 +148,37 @@ export class ContentService {
     const rng = createRng(seed);
     const content = modes.map((k) => {
       const engine = engineFor(k);
-      return this.bank.draw(
-        engine.contentKind,
-        engine.itemsNeeded(playerCount),
-        rng,
-        used,
-        undefined,
-        this.allowedForPlay,
-      );
+      return this.drawPreferringReal(engine.contentKind, engine.itemsNeeded(playerCount), rng, used);
     });
-    const tiebreak = this.bank.draw('mcq', 5, rng, used, undefined, this.allowedForPlay) as McqItem[];
+    const tiebreak = this.drawPreferringReal('mcq', 5, rng, used) as McqItem[];
     return { content, tiebreak };
+  }
+
+  private isReal = (q: Question) => q.sourceIds.every((id) => sourceById(id)?.kind !== 'SYNTHETIC_FIXTURE');
+
+  /**
+   * Real (provider) questions first; fictional fixture questions only fill what is missing, so a
+   * game is never blocked while the real bank is still small.
+   */
+  private drawPreferringReal(
+    kind: ContentItem['kind'],
+    count: number,
+    rng: () => number,
+    used: Set<string>,
+  ): ContentItem[] {
+    const realAllowed = (q: Question) => this.allowedForPlay(q) && this.isReal(q);
+    const available = this.bank
+      .all()
+      .filter((q) => q.kind === kind && q.status === 'PUBLISHED' && !used.has(q.id) && realAllowed(q)).length;
+    const real =
+      available > 0
+        ? this.bank.draw(kind, Math.min(count, available), rng, used, undefined, realAllowed)
+        : [];
+    const rest =
+      real.length < count
+        ? this.bank.draw(kind, count - real.length, rng, used, undefined, this.allowedForPlay)
+        : [];
+    return shuffle([...real, ...rest], rng);
   }
 
   availability(): Record<string, { published: number }> {

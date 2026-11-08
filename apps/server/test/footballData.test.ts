@@ -159,4 +159,46 @@ describe('football-data.org through the server', () => {
     }
     expect(sawReal).toBe(true);
   });
+  it('games use real questions first and fill the rest with fictional ones', async () => {
+    const { ContentService } = await import('../src/contentService.js');
+    const { MemoryPersistence } = await import('../src/persistence.js');
+    const svc = new ContentService(new MemoryPersistence(), pino({ level: 'silent' }), {
+      strict: false,
+      requireCommercialRights: false,
+      footballData: {
+        enabled: true,
+        competitions: ['FPL'],
+        seasons: [2024, 2025],
+        fetch: fakeApi().f,
+        minIntervalMs: 0,
+      },
+    });
+    await svc.init();
+    svc.startIngest();
+    await svc.waitForIngest();
+    await svc.setLicense('src_football_data_org', {
+      status: 'APPROVED',
+      allowedUses: ['GAMEPLAY'],
+      by: 'owner',
+      note: 'testing',
+    });
+    const hl = svc.bank
+      .all()
+      .filter(
+        (q) =>
+          q.sourceIds.includes('src_football_data_org') &&
+          q.kind === 'higher_lower' &&
+          q.status === 'NEEDS_REVIEW',
+      );
+    // Approve only 3 real Higher-or-Lower items: a 5-item game takes all 3 real + 2 fictional.
+    await svc.bulkReview(
+      hl.slice(0, 3).map((q) => q.id),
+      'APPROVE',
+      'owner',
+      'checked',
+    );
+    const items = svc.drawForMatch(['higher_lower'], 2, 7, new Set()).content[0]!;
+    expect(items).toHaveLength(5);
+    expect(items.filter((i) => i.meta.sourceIds.includes('src_football_data_org'))).toHaveLength(3);
+  });
 });

@@ -136,8 +136,10 @@ export function Admin() {
         </button>
       </div>
       <Banner tone="warn">
-        Development data is a fictional league. No licensed real-world provider is integrated yet — every
-        candidate real source is listed with license PENDING.
+        Questions from “Synthetic Dev League” are fictional test data (made-up clubs and players). Real
+        questions come from football-data.org: they appear under Source → football-data.org once the server
+        has a FOOTBALL_DATA_API_KEY, after you record the license in Sources &amp; rights and approve them
+        here. When enough real questions are published, games use them first.
       </Banner>
       {summary ? <Summary counts={summary.counts} conflicts={summary.conflicts} /> : <Skeleton h={90} />}
       <div className="seg" role="tablist" style={{ maxWidth: 520 }}>
