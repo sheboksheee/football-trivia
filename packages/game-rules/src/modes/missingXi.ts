@@ -35,7 +35,14 @@ export const missingXiEngine = makeSimultaneousEngine<MissingXiItem, XiAnswer, X
     if (!text || text.length > 80) throw new GameError('INVALID_MESSAGE', 'Answer must be 1–80 characters');
     return { at: now, text, hintsViewed: s.extra.hints[`${s.index}:${memberId}`] ?? 0 };
   },
-  grade: (item, ans) => ans !== undefined && matchesAlias(ans.text, [item.missingAnswer, ...item.aliases]),
+  // Typos are tolerated unless the answer is as close to another player in the same lineup.
+  grade: (item, ans) =>
+    ans !== undefined &&
+    matchesAlias(
+      ans.text,
+      [item.missingAnswer, ...item.aliases],
+      item.slots.map((s) => s.player).filter((p): p is string => !!p),
+    ),
   scores(s, correct) {
     return Object.fromEntries(
       s.players.map((m) => {

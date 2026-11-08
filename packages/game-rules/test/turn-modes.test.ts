@@ -137,7 +137,7 @@ describe('TOP 25 (PROVISIONAL end conditions)', () => {
   });
   it('hidden grid never reveals unfound names; appeal ACCEPT needs an unclaimed rank', () => {
     let s = top25Engine.init(ctx(['a', 'b']), [top25()], 0);
-    s = top25Engine.act(s, pl('a'), { type: 'guess', text: 'Nam 5' }, 10);
+    s = top25Engine.act(s, pl('a'), { type: 'guess', text: 'Totally Wrong' }, 10);
     const v = JSON.stringify(top25Engine.view(s, { memberId: null, role: 'SPECTATOR' }, 11));
     expect(v).not.toContain('Name ');
     expect(top25Engine.appealWindows(s, 11)).toEqual([

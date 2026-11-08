@@ -114,13 +114,48 @@ export class ContentService {
         bank.upsert({ ...q, audit: [...prev.audit, ...q.audit.slice(-1)] });
         continue;
       }
-      bank.upsert({ ...q, status: prev.status, audit: prev.audit, difficulty: prev.difficulty });
+      // Same verified facts (same fingerprint) but new wording, e.g. Arabic templates: keep the human
+      // decision, bump the version and record the rewording in the audit trail.
+      const wording = (x: Question) => JSON.stringify({ ...x.item, meta: undefined });
+      if (wording(prev) !== wording(q)) {
+        const version = prev.version + 1;
+        bank.upsert({
+          ...q,
+          version,
+          item: { ...q.item, meta: { ...q.item.meta, version } },
+          status: prev.status,
+          difficulty: prev.difficulty,
+          audit: [
+            ...prev.audit,
+            {
+              at: new Date().toISOString(),
+              actor: 'pipeline',
+              action: 'reworded',
+              fromStatus: prev.status,
+              toStatus: prev.status,
+              note: 'Wording regenerated from the same verified facts (fingerprint unchanged)',
+            },
+          ],
+        });
+      } else {
+        bank.upsert({
+          ...q,
+          version: prev.version,
+          item: { ...q.item, meta: { ...q.item.meta, version: prev.version } },
+          status: prev.status,
+          audit: prev.audit,
+          difficulty: prev.difficulty,
+        });
+      }
       restored++;
     }
     this.bank = bank;
     this.ingest.snapshots = this.fdSnapshots.length;
     await this.db.saveQuestions(
-      bank.all().filter((q) => stored.get(q.id)?.status !== q.status || !stored.has(q.id)),
+      bank.all().filter((q) => {
+        const prev = stored.get(q.id);
+        return !prev || prev.status !== q.status || prev.version !== q.version;
+      }),
     );
     this.log.info(
       {

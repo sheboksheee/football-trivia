@@ -9,6 +9,11 @@ Legend: **APPROVED** = user-confirmed (authoritative). **PROPOSED** = chosen by 
 - Match Night 5/3/1/0 with shared-place average; championship ladder and max five simultaneous MCQ tiebreaks, then shared champions.
 - 12 game modes as described in canonical GDD/Blueprint.
 
+## Approved by the owner (2026-11-08)
+- **Questions in Egyptian Arabic** (real-data templates), club/league names in Arabic (`providers/footballDataArabic.ts`, needs native review). Rewording keeps an approved question approved when its facts (fingerprint) are unchanged; the version is bumped and the rewording is audited.
+- **Typed answers accept Arabic or English**, ignore the Arabic article and FC/AFC-type tokens, and **tolerate spelling mistakes**: 0 typos for ≤3 letters, 1 for ≤5, 2 for ≤10, 3 above (adjacent swaps count as one). A misspelling is accepted only if it is strictly closer to the right answer than to every rival in the same question (e.g. other lineup players, other TOP 25 entries); ties match nothing. Exact matches always count.
+- **Fictional questions retired** on the demo server; games draw real questions first.
+
 ## BLOCKED — needs a product decision before code
 | Item | Why | Effect today |
 |---|---|---|

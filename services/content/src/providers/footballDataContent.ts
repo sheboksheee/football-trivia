@@ -8,6 +8,7 @@ import { createRng, shuffle } from '@ft/shared';
 import type { Candidate } from '../generators/index.js';
 import type { Entity, Fact, GateResult, RawSnapshot } from '../model.js';
 import { FOOTBALL_DATA_SOURCE_ID } from '../sources.js';
+import { CLUB_AR, COMPETITION_AR } from './footballDataArabic.js';
 
 // ---------------------------------------------------------------- runtime validation of provider payloads
 const Team = z
@@ -169,14 +170,17 @@ export function normalizeFootballData(snaps: RawSnapshot[], today: string): FdKB
   const teamEntity = (t: z.infer<typeof Team>, snap: RawSnapshot) => {
     const id = `fd_team_${t.id}`;
     const prev = kb.entities.get(id);
-    const aliases = [t.shortName].filter((x): x is string => !!x && x !== t.name);
+    const club = CLUB_AR[t.id];
+    const aliases = [t.shortName, club?.ar, ...(club?.aliases ?? [])].filter(
+      (x): x is string => !!x && x !== t.name,
+    );
     if (prev) prev.aliases = [...new Set([...prev.aliases, ...aliases])];
     else
       kb.entities.set(id, {
         id,
         type: 'CLUB',
         name: t.name,
-        names: { en: t.name },
+        names: { en: t.name, ...(club ? { ar: club.ar } : {}) },
         aliases,
         sourceRefs: { [snap.sourceId]: String(t.id) },
       });
@@ -383,7 +387,10 @@ export function generateFootballDataCandidates(kb: FdKB, o: FdGenOptions): Candi
   const rng = createRng(o.seed ?? 11);
   const per = o.perSeason ?? { score: 12, timeline: 8, guess: 8 };
   const out: Candidate[] = [];
-  const name = (id: string) => kb.teams.get(id)?.name ?? kb.entities.get(id)?.name ?? id;
+  // Questions are written in Egyptian Arabic; club names use the Arabic name when known.
+  const name = (id: string) =>
+    kb.entities.get(id)?.names.ar ?? kb.teams.get(id)?.name ?? kb.entities.get(id)?.name ?? id;
+  const comp = (code: string, fallback: string) => COMPETITION_AR[code] ?? fallback;
   const aliases = (id: string) => kb.entities.get(id)?.aliases ?? [];
   const age = (d: string) => clamp(((Number(o.today.slice(0, 4)) - Number(d.slice(0, 4))) / 10) * 100);
 
@@ -412,10 +419,10 @@ export function generateFootballDataCandidates(kb: FdKB, o: FdGenOptions): Candi
       template: 'fd.mcq.champion',
       item: {
         kind: 'mcq',
-        prompt: `Who finished top of the ${t.competition} table in ${t.season}?`,
+        prompt: `مين خلّص في صدارة ${comp(t.competitionCode, t.competition)} موسم ${t.season}؟`,
         options,
         correctOptionId: options[opts.indexOf(champ)]!.id,
-        explanation: `${name(champ.team)} finished 1st with ${champ.points} points.`,
+        explanation: `${name(champ.team)} خلّص الأول برصيد ${champ.points} نقطة.`,
       },
       factIds: opts.map((r) => r.factIds.position),
       entityIds: opts.map((r) => r.team),
@@ -449,9 +456,9 @@ export function generateFootballDataCandidates(kb: FdKB, o: FdGenOptions): Candi
           template: `fd.hl.${stat}`,
           item: {
             kind: 'higher_lower',
-            statLabel: stat === 'points' ? 'League points' : 'League goals scored',
-            scope: `${t.competition} ${t.season}, final regular-season table`,
-            unit: stat === 'points' ? 'pts' : 'goals',
+            statLabel: stat === 'points' ? 'نقط الدوري' : 'أهداف الدوري',
+            scope: `${comp(t.competitionCode, t.competition)} موسم ${t.season} (الجدول النهائي)`,
+            unit: stat === 'points' ? 'نقطة' : 'هدف',
             a: { label: name(a.team), value: a[stat] },
             b: { label: name(b.team), value: b[stat] },
           },
@@ -489,10 +496,10 @@ export function generateFootballDataCandidates(kb: FdKB, o: FdGenOptions): Candi
       template: 'fd.sa.club_by_venue',
       item: {
         kind: 'short_answer',
-        prompt: `Which club plays its home matches at ${t.venue}?`,
-        answer: t.name,
-        aliases: aliases(t.entityId),
-        explanation: `${t.venue} is the home ground of ${t.name}.`,
+        prompt: `أنهي نادي بيلعب ماتشاته على أرضه في ملعب ${t.venue}؟`,
+        answer: name(t.entityId),
+        aliases: [t.name, ...aliases(t.entityId)].filter((a) => a !== name(t.entityId)),
+        explanation: `${t.venue} هو ملعب ${name(t.entityId)}.`,
       },
       factIds: [t.venueFactId!],
       entityIds: [t.entityId],
@@ -530,10 +537,10 @@ export function generateFootballDataCandidates(kb: FdKB, o: FdGenOptions): Candi
         template: 'fd.mcq.home_venue',
         item: {
           kind: 'mcq',
-          prompt: `Which ground is home to ${t.name}?`,
+          prompt: `أنهي ملعب ده ملعب ${name(t.entityId)}؟`,
           options,
           correctOptionId: options[opts.indexOf(t)]!.id,
-          explanation: `${t.name} play at ${t.venue}.`,
+          explanation: `${name(t.entityId)} بيلعب على ملعب ${t.venue}.`,
         },
         factIds: opts.map((x) => x.venueFactId!),
         entityIds: opts.map((x) => x.entityId),
@@ -596,7 +603,7 @@ export function generateFootballDataCandidates(kb: FdKB, o: FdGenOptions): Candi
         template: 'fd.mcq.match_score',
         item: {
           kind: 'mcq',
-          prompt: `${m.competition} ${m.season}: what was the full-time score when ${name(m.home)} hosted ${name(m.away)} on ${m.date}?`,
+          prompt: `${comp(m.competitionCode, m.competition)} موسم ${m.season}: النتيجة كانت كام لما ${name(m.home)} استضاف ${name(m.away)} يوم ${m.date}؟`,
           options,
           correctOptionId: options[opts.indexOf(actual)]!.id,
           explanation: `${label(m)} (${m.date}).`,
@@ -631,7 +638,7 @@ export function generateFootballDataCandidates(kb: FdKB, o: FdGenOptions): Candi
         template: 'fd.tl.match_order',
         item: {
           kind: 'timeline',
-          prompt: `${x.competition}: which of these matches was played first?`,
+          prompt: `${comp(x.competitionCode, x.competition)}: أنهي ماتش من دول اتلعب الأول؟`,
           events: [
             { id: 'e1', label: label(x), date: x.date },
             { id: 'e2', label: label(y), date: y.date },
@@ -670,7 +677,7 @@ export function generateFootballDataCandidates(kb: FdKB, o: FdGenOptions): Candi
       ).slice(0, 3);
       if (others.length < 3) continue;
       const opts = shuffle([m, ...others], rng);
-      const options = opts.map((x, i) => ({ id: `o${i + 1}`, label: `${name(x.home)} vs ${name(x.away)}` }));
+      const options = opts.map((x, i) => ({ id: `o${i + 1}`, label: `${name(x.home)} ضد ${name(x.away)}` }));
       const fits = (x: FdMatch) =>
         x.matchday === m.matchday && x.homeGoals === m.homeGoals && x.awayGoals === m.awayGoals;
       out.push({
@@ -681,9 +688,9 @@ export function generateFootballDataCandidates(kb: FdKB, o: FdGenOptions): Candi
           options,
           correctOptionId: options[opts.indexOf(m)]!.id,
           clues: [
-            `${m.competition} ${m.season}`,
-            `Matchday ${m.matchday}`,
-            `Full-time score ${m.homeGoals}–${m.awayGoals}`,
+            `${comp(m.competitionCode, m.competition)} موسم ${m.season}`,
+            `الجولة ${m.matchday}`,
+            `النتيجة النهائية ${m.homeGoals}–${m.awayGoals}`,
           ],
         },
         factIds: opts.flatMap((x) => [x.factIds.score, ...(x.factIds.matchday ? [x.factIds.matchday] : [])]),

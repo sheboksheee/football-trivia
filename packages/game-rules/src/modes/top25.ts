@@ -1,4 +1,4 @@
-import { GameError, matchesAlias, type AppealDecision, type Top25Item } from '@ft/shared';
+import { bestMatch, GameError, type AppealDecision, type Top25Item } from '@ft/shared';
 import type { Engine } from '../types.js';
 import type { Timing } from '../timing.js';
 import { groupByScore } from '../ranking.js';
@@ -94,7 +94,8 @@ function record(s: Top25State, g: Omit<Guess, 'duplicate'>, at: number): Top25St
 }
 
 export function matchEntry(item: Top25Item, text: string): number | null {
-  const e = item.entries.find((en) => matchesAlias(text, [en.label, ...en.aliases]));
+  // Best single entry, typo-tolerant; an answer equally close to two entries matches neither.
+  const e = bestMatch(text, item.entries, (en) => [en.label, ...en.aliases]);
   return e ? e.rank : null;
 }
 

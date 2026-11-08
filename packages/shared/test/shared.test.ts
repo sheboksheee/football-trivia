@@ -97,3 +97,42 @@ describe('protocol validation', () => {
     expect(ClientCommand.safeParse({ type: 'nope', payload: {} }).success).toBe(false);
   });
 });
+
+describe('typo-tolerant, bilingual answer matching', () => {
+  it('accepts Arabic or English, with or without the article / FC, and common Arabic spelling variants', async () => {
+    const { matchesAlias } = await import('../src/index.js');
+    const liverpool = ['Liverpool FC', 'Liverpool', 'ليفربول'];
+    for (const a of [
+      'liverpool',
+      'Liverpool F.C.',
+      'ليفربول',
+      'الليفربول',
+      'Liverpol',
+      'Livrpool',
+      'ليفربوول',
+      'ليفربل',
+    ])
+      expect(matchesAlias(a, liverpool)).toBe(true);
+    expect(matchesAlias('إنتر', ['انتر'])).toBe(true);
+    expect(matchesAlias('الأهلى', ['الاهلي'])).toBe(true);
+    expect(matchesAlias('مدرسه', ['مدرسة'])).toBe(true);
+  });
+  it('rejects real differences, very short words with typos, and answers as close to a rival', async () => {
+    const { matchesAlias, bestMatch } = await import('../src/index.js');
+    expect(matchesAlias('Chelsea', ['Liverpool FC', 'ليفربول'])).toBe(false);
+    expect(matchesAlias('PSV', ['PSG'])).toBe(false); // 3 letters: no typo allowed
+    // "Bayer" (Leverkusen) is not "Bayern" when Bayern is a rival in the same question
+    expect(
+      matchesAlias(
+        'Bayer',
+        ['FC Bayern München', 'Bayern'],
+        ['Bayer 04 Leverkusen', 'Bayer Leverkusen', 'Bayer'],
+      ),
+    ).toBe(false);
+    expect(matchesAlias('Bayren', ['Bayern'], ['Bayer'])).toBe(true);
+    // ambiguous between two list entries -> no match
+    const entries = [{ n: 'Silva' }, { n: 'Silvo' }];
+    expect(bestMatch('Silvu', entries, (e) => [e.n])).toBeNull();
+    expect(bestMatch('Silva', entries, (e) => [e.n])).toEqual({ n: 'Silva' });
+  });
+});

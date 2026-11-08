@@ -201,4 +201,46 @@ describe('football-data.org through the server', () => {
     expect(items).toHaveLength(5);
     expect(items.filter((i) => i.meta.sourceIds.includes('src_football_data_org'))).toHaveLength(3);
   });
+  it('rewording an approved question (same facts) keeps the approval, bumps the version once, and audits it', async () => {
+    const { ContentService } = await import('../src/contentService.js');
+    const { MemoryPersistence } = await import('../src/persistence.js');
+    const db = new MemoryPersistence();
+    const svc = new ContentService(db, pino({ level: 'silent' }), {
+      strict: false,
+      requireCommercialRights: false,
+      footballData: {
+        enabled: true,
+        competitions: ['FPL'],
+        seasons: [2024, 2025],
+        fetch: fakeApi().f,
+        minIntervalMs: 0,
+      },
+    });
+    await svc.init();
+    svc.startIngest();
+    await svc.waitForIngest();
+    await svc.setLicense('src_football_data_org', {
+      status: 'APPROVED',
+      allowedUses: ['GAMEPLAY'],
+      by: 'owner',
+      note: 'testing',
+    });
+    const q = svc.bank.all().find((x) => x.template === 'fd.mcq.champion' && x.status === 'NEEDS_REVIEW')!;
+    await svc.review(q.id, 'APPROVE', 'owner', 'checked');
+    // Simulate the old (English) wording stored before the Arabic templates.
+    const stored = db.questions.get(q.id)!;
+    db.questions.set(q.id, {
+      ...stored,
+      item: { ...stored.item, prompt: 'Who finished top of the table?' } as never,
+    });
+    await svc.rebuild();
+    const after = svc.bank.get(q.id)!;
+    expect(after.status).toBe('PUBLISHED');
+    expect(after.version).toBe(2);
+    expect(after.item.meta.version).toBe(2);
+    expect((after.item as { prompt: string }).prompt).toContain('مين خلّص في صدارة');
+    expect(after.audit.at(-1)!.action).toBe('reworded');
+    await svc.rebuild();
+    expect(svc.bank.get(q.id)!.version).toBe(2); // not bumped again on the next restart
+  });
 });
