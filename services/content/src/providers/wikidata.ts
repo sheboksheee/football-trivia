@@ -683,5 +683,52 @@ export function generateWikidataCandidates(kb: WdKB, o: WdGenOptions = {}): Cand
       preRevealText: [],
     });
   }
+  // ---- Buzzer (short answer): "which player played for A, B and C?" — only when exactly one fetched
+  // player has all three memberships (any sitelink count), so the answer is unique in our data.
+  const allPlayers = [...kb.players.values()];
+  for (const p of players.filter((x) => x.sitelinks >= memMin)) {
+    const mine = clubsOf(p).sort();
+    if (mine.length < 3) continue;
+    const rng = seedOf(`sa:${p.qid}`);
+    const three = shuffle(mine, rng).slice(0, 3).sort();
+    const others = allPlayers.filter((x) => x !== p && three.every((c) => clubsOf(x).includes(c)));
+    const e = kb.entities.get(p.entityId)!;
+    const names = three.map(clubName);
+    out.push({
+      kind: 'short_answer',
+      template: 'wd.sa.player_by_clubs',
+      item: {
+        kind: 'short_answer',
+        prompt: `مين اللاعيب اللي لعب في ${names[0]} و${names[1]} و${names[2]}؟`,
+        answer: playerName(p),
+        aliases: e.aliases,
+        explanation: `${playerName(p)} لعب في التلات نوادي (حسب Wikidata).`,
+      },
+      factIds: p.spells.filter((x) => three.includes(x.club)).map((x) => x.factId),
+      entityIds: [p.entityId, ...three],
+      fingerprint: fp(['wd_sa_clubs', p.qid, three]),
+      validators: [
+        others.length === 0
+          ? ok('MODE_VALIDATOR', 'Exactly one fetched player played for all three clubs')
+          : fail(
+              'MODE_VALIDATOR',
+              'REJECTED',
+              `Not unique: also ${others
+                .slice(0, 3)
+                .map((x) => x.en)
+                .join(', ')}`,
+            ),
+      ],
+      components: {
+        rarity: rarity(p),
+        complexity: 55,
+        distractorSimilarity: 40,
+        temporalDistance: 30,
+        recallDepth: 60,
+      },
+      secretStrings: [p.en, ...(p.ar ? [p.ar] : [])],
+      preRevealText: [`${names.join(' ')}`],
+    });
+  }
   return out;
 }

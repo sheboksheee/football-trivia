@@ -48,6 +48,7 @@ const CAREERS: Record<number, Array<[string, number, number | null]>> = {
   1: [
     ['Alder FC', 2011, 2014],
     ['Cedar Town', 2014, 2020],
+    ['Dune Rovers', 2020, 2022],
   ],
   2: [
     ['Alder FC', 2012, 2016],
@@ -60,7 +61,8 @@ const CAREERS: Record<number, Array<[string, number, number | null]>> = {
   ],
   5: [
     ['Birch United', 2010, 2013],
-    ['Elm City', 2013, null],
+    ['Elm City', 2013, 2016],
+    ['Cedar Town', 2016, null],
   ],
   6: [
     ['Birch United', 2012, 2014],
@@ -69,6 +71,7 @@ const CAREERS: Record<number, Array<[string, number, number | null]>> = {
   7: [
     ['Birch United', 2014, 2017],
     ['Elm City', 2017, 2020],
+    ['Cedar Town', 2020, 2023],
   ],
   8: [
     ['Birch United', 2016, 2018],

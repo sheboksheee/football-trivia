@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { matchesAlias, type ConnectionItem, type ImpostorItem, type McqItem } from '@ft/shared';
+import {
+  matchesAlias,
+  type ShortAnswerItem,
+  type ConnectionItem,
+  type ImpostorItem,
+  type McqItem,
+} from '@ft/shared';
 import {
   WikidataClient,
   ingestWikidata,
@@ -114,7 +120,7 @@ describe('Wikidata questions', () => {
   it('every membership is a scoped fact linked to its snapshot', async () => {
     const k = await kb();
     expect(k.players.size).toBe(PLAYERS.length);
-    expect(k.facts).toHaveLength(18);
+    expect(k.facts).toHaveLength(21);
     for (const f of k.facts) {
       expect(k.snapshots.has(f.evidenceId)).toBe(true);
       expect(f.scope.cutoff).toBe('2026-11-09');
@@ -227,5 +233,22 @@ describe('Wikidata data hygiene', () => {
     expect(moss.length).toBeGreaterThan(0);
     expect(moss.every((c) => after.has(c.fingerprint))).toBe(true);
     expect(before.size).toBeGreaterThan(0);
+  });
+
+  it('Buzzer: "who played for A, B and C?" only when exactly one player fits', async () => {
+    const { report } = await ingest();
+    const sa = generateWikidataCandidates(normalizeWikidata(report.snapshots)).filter(
+      (c) => c.template === 'wd.sa.player_by_clubs',
+    );
+    const by = (en: string) =>
+      sa.find((c) => c.entityIds[0] === `wd_player_${PLAYERS.find((p) => p.en === en)!.q}`)!;
+    expect(by('Bruno Kest').validators[0]!.passed).toBe(true);
+    // Felix Arno and Hugo Lind both played for Birch, Elm and Cedar -> ambiguous -> rejected
+    expect(by('Felix Arno').validators[0]!.passed).toBe(false);
+    expect(by('Hugo Lind').validators[0]!.passed).toBe(false);
+    const item = by('Bruno Kest').item as ShortAnswerItem;
+    expect(item.answer).toBe('برونو كيست');
+    expect(matchesAlias('Kest', [item.answer, ...item.aliases])).toBe(true);
+    expect(by('Bruno Kest').preRevealText.join(' ')).not.toContain('Kest');
   });
 });

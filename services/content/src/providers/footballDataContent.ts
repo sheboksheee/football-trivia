@@ -4,7 +4,7 @@
  */
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { createRng, shuffle } from '@ft/shared';
+import { createRng, normalizeAnswer, shuffle } from '@ft/shared';
 import type { Candidate } from '../generators/index.js';
 import type { Entity, Fact, GateResult, RawSnapshot } from '../model.js';
 import { FOOTBALL_DATA_SOURCE_ID } from '../sources.js';
@@ -713,6 +713,113 @@ export function generateFootballDataCandidates(kb: FdKB, o: FdGenOptions): Candi
         },
         secretStrings: [],
         preRevealText: options.map((x) => x.label),
+      });
+    }
+  }
+  // ---- Auction: "name clubs that played in league X, season Y" — the final table is the complete,
+  // verified answer universe (every club that played a league match that season).
+  for (const t of kb.tables.filter((x) => x.complete && x.rows.length >= 6)) {
+    const rows = [...t.rows].sort((a, b) => a.position - b.position);
+    const labels = rows.map((r) => normalizeAnswer(name(r.team)));
+    out.push({
+      kind: 'auction',
+      template: 'fd.auction.league_clubs',
+      item: {
+        kind: 'auction',
+        category: `نوادي لعبت في ${comp(t.competitionCode, t.competition)} موسم ${t.season}`,
+        scope: `الجدول النهائي للموسم (${rows.length} نادي)`,
+        universe: rows.map((r) => ({
+          label: name(r.team),
+          aliases: [kb.entities.get(r.team)?.name ?? '', ...aliases(r.team)].filter(Boolean),
+        })),
+      },
+      factIds: rows.map((r) => r.factIds.position),
+      entityIds: rows.map((r) => r.team),
+      fingerprint: fp(['fd_auction_clubs', t.competitionCode, t.season]),
+      validators: [
+        new Set(labels).size === labels.length
+          ? ok('MODE_VALIDATOR', `Complete universe: all ${rows.length} clubs of the final table`)
+          : fail('MODE_VALIDATOR', 'REJECTED', 'Duplicate club names in the universe'),
+        ...awardedWarning(t, []),
+      ],
+      components: {
+        rarity: 30,
+        complexity: 40,
+        distractorSimilarity: 0,
+        temporalDistance: age(t.cutoff),
+        recallDepth: 60,
+      },
+      secretStrings: [],
+      preRevealText: [],
+    });
+  }
+
+  // ---- TOP 25: clubs across the big five leagues in one season, by points / goals scored in the
+  // final tables. Only seasons where all five tables are complete; documented tie-break; a tie that
+  // survives it inside the list or at the 25/26 boundary rejects the list.
+  const BIG5 = ['PL', 'PD', 'SA', 'BL1', 'FL1'];
+  const seasons = [...new Set(kb.tables.map((t) => t.season))].sort();
+  for (const season of seasons) {
+    const tables = BIG5.map((code) =>
+      kb.tables.find((t) => t.competitionCode === code && t.season === season),
+    );
+    if (tables.some((t) => !t || !t.complete)) continue;
+    const rows = tables.flatMap((t) => t!.rows.map((r) => ({ ...r, table: t! })));
+    for (const stat of ['points', 'goalsFor'] as const) {
+      const tb = stat === 'points' ? 'goalsFor' : 'points';
+      const sorted = [...rows].sort((a, b) => b[stat] - a[stat] || b[tb] - a[tb]);
+      const top = sorted.slice(0, 25);
+      const same = (x?: (typeof rows)[number], y?: (typeof rows)[number]) =>
+        !!x && !!y && x[stat] === y[stat] && x[tb] === y[tb];
+      const ties = top.some((r, i) => i > 0 && same(top[i - 1], r)) || same(sorted[25], top[24]);
+      const unit = stat === 'points' ? 'نقطة' : 'هدف';
+      out.push({
+        kind: 'top25',
+        template: `fd.top25.big5_${stat}`,
+        item: {
+          kind: 'top25',
+          title:
+            stat === 'points'
+              ? `أكتر 25 نادي جمعوا نقط في الدوريات الخمس الكبار موسم ${season}`
+              : `أكتر 25 نادي جابوا أهداف في الدوريات الخمس الكبار موسم ${season}`,
+          scope: `الجداول النهائية (إنجلترا، إسبانيا، إيطاليا، ألمانيا، فرنسا). التعادل يتكسر بـ${stat === 'points' ? 'الأهداف المسجلة' : 'النقط'}. الدوري الألماني 34 ماتش والباقي 38.`,
+          entries: top.map((r, i) => ({
+            rank: i + 1,
+            label: name(r.team),
+            aliases: [kb.entities.get(r.team)?.name ?? '', ...aliases(r.team)].filter(Boolean),
+            metric: `${r[stat]} ${unit}`,
+          })),
+        },
+        factIds: top.flatMap((r) => [r.factIds[stat], r.factIds[tb]]),
+        entityIds: top.map((r) => r.team),
+        fingerprint: fp(['fd_top25_big5', stat, season]),
+        validators: [
+          top.length === 25 && new Set(top.map((r) => r.team)).size === 25
+            ? ok('MODE_VALIDATOR', 'Exactly 25 unique clubs')
+            : fail('MODE_VALIDATOR', 'REJECTED', 'Fewer than 25 clubs'),
+          ties
+            ? fail(
+                'MODE_VALIDATOR',
+                'REJECTED',
+                'Unresolved tie inside the list or at the 25/26 boundary after the documented tie-break',
+              )
+            : ok('MODE_VALIDATOR', 'Strictly ordered after documented tie-break; no boundary tie'),
+          ...tables.flatMap((t) =>
+            awardedWarning(
+              t!,
+              top.map((r) => r.team),
+            ),
+          ),
+        ],
+        components: {
+          rarity: 50,
+          complexity: 70,
+          distractorSimilarity: 0,
+          temporalDistance: age(`${season.slice(0, 4)}-06-01`),
+          recallDepth: 85,
+        },
+        secretStrings: [],
+        preRevealText: [],
       });
     }
   }
