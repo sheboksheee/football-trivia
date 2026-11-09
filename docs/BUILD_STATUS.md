@@ -39,6 +39,9 @@ Without `TEST_DATABASE_URL` the 2 PostgreSQL tests are skipped (154 run).
 - Every mode: scoring examples, timeout, tie, disconnect, replay → mode tests, room tests, and `apps/server/test/soak.test.ts` (an 11-mode Match Night with random bots, judge and appeals over 3 seeds: completes, no skipped modes, placement shares sum to exactly 9 per mode, spectator never sees the Impostor secret, and the event log replays to byte-identical state).
 - Mobile widths/desktop, RTL, keyboard, reduced motion, 44px targets → `tests/e2e/game.spec.ts`
 
+## Live content (Render demo, 2026-11-09)
+10 of 12 modes play on real, human-approved questions: Higher or Lower 164, Timeline 107, Guess the Match 159, Last Man Standing / Risk It 1,695, The Impostor 420, Connections 295, Buzzer 535, Auction 15, TOP 25 6. Missing XI has no line-up source yet (StatsBomb next); Who Am I? is blocked on rules.
+
 ## Blockers (need you — not engineering choices)
 1. **Who Am I? rules** (timing, input type, wrong answers, ties).
 2. **Approve or change every PROPOSED item** in `docs/DECISIONS.md` (8 modes are "Provisional").
