@@ -784,7 +784,7 @@ export function generateWikidataCandidates(kb: WdKB, o: WdGenOptions = {}): Cand
     ];
     const medium: Clue[] = [
       ...(p.nationalityAr || p.nationality
-        ? [{ text: `بيلعب لمنتخب ${p.nationalityAr ?? p.nationality}`, facts: [], clubs: [], nat: true }]
+        ? [{ text: `لعب لمنتخب ${p.nationalityAr ?? p.nationality}`, facts: [], clubs: [], nat: true }]
         : []),
       ...spellsWithYear.map((x) => {
         const decade = Math.floor(Number(x.from!.slice(0, 4)) / 10) * 10;
