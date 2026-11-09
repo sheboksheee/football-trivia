@@ -9,7 +9,8 @@ services:
     runtime: node
     plan: free
     buildCommand: corepack enable && pnpm install --frozen-lockfile && pnpm --filter @ft/web build && pnpm --filter @ft/server build
-    startCommand: node apps/server/dist/main.js
+    # Free instances have 512 MB: cap the JS heap so the GC works harder before the OS kills us.
+    startCommand: node --max-old-space-size=400 apps/server/dist/main.js
     healthCheckPath: /healthz
     envVars:
       - key: NODE_VERSION

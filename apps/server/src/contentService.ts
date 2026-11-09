@@ -448,7 +448,8 @@ export class ContentService {
           this.ofSnapshots = [...this.ofSnapshots.filter((x) => x.id !== snap.id), snap];
         },
       });
-      await this.rebuild();
+      // Rebuilding is the memory-heavy step (small hosts): only when something new arrived.
+      if (wd.snapshots.length + of.snapshots.length > 0) await this.rebuild();
       this.open.lastReport = {
         wikidata: { added: wd.snapshots.length, calls: wd.calls, skipped: wd.skipped },
         openFootball: { added: of.snapshots.length, calls: of.calls, skipped: of.skipped },
