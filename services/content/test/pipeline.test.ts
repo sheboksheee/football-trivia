@@ -36,8 +36,12 @@ describe('fixture provenance', () => {
     const real = SOURCES.filter((s) => s.kind !== 'SYNTHETIC_FIXTURE');
     expect(real.length).toBeGreaterThan(5);
     expect(real.every((s) => s.licenseStatus === 'PENDING' && !s.autoApproveEligible)).toBe(true);
-    // Only football-data.org is integrated; the rest remain candidates.
-    expect(real.filter((s) => s.integrated).map((s) => s.id)).toEqual(['src_football_data_org']);
+    // football-data.org, Wikidata and OpenFootball are integrated; the rest remain candidates.
+    expect(real.filter((s) => s.integrated).map((s) => s.id)).toEqual([
+      'src_football_data_org',
+      'src_wikidata',
+      'src_openfootball',
+    ]);
   });
   it('adapter contract returns NOT_SUPPORTED explicitly', async () => {
     const ad = syntheticAdapter();

@@ -12,6 +12,8 @@ import {
   normalizeFootballData,
   type FdKB,
 } from './providers/footballDataContent.js';
+import { generateWikidataCandidates, normalizeWikidata, type WdKB } from './providers/wikidata.js';
+import { crossCheckOpenFootball, type CrossCheckReport } from './providers/openFootball.js';
 import type { RawSnapshot } from './model.js';
 import type { GateKB } from './gates.js';
 
@@ -31,11 +33,19 @@ export interface PipelineResult {
   conflicts: ConflictReport[];
   /** Real-provider knowledge base (football-data.org), when snapshots were supplied. */
   fdKb: FdKB | null;
+  /** Wikidata knowledge base (club careers), when snapshots were supplied. */
+  wdKb: WdKB | null;
+  /** OpenFootball cross-check of football-data.org scores. */
+  crossCheck: CrossCheckReport | null;
 }
 
 export interface PipelineInputs {
   /** Stored football-data.org snapshots (immutable provenance). */
   footballData?: RawSnapshot[];
+  /** Stored Wikidata snapshots. */
+  wikidata?: RawSnapshot[];
+  /** Stored OpenFootball snapshots (cross-check only). */
+  openFootball?: RawSnapshot[];
   /** ISO date used to decide which seasons are complete. */
   today?: string;
 }
@@ -56,6 +66,10 @@ export function runPipeline(
   const conflicts = verify(kb);
   const today = inputs.today ?? new Date().toISOString().slice(0, 10);
   const fdKb = inputs.footballData?.length ? normalizeFootballData(inputs.footballData, today) : null;
+  // Independent cross-check BEFORE generation, so disagreeing scores are quarantined by the TRUTH gate.
+  const crossCheck =
+    fdKb && inputs.openFootball?.length ? crossCheckOpenFootball(fdKb, inputs.openFootball) : null;
+  const wdKb = inputs.wikidata?.length ? normalizeWikidata(inputs.wikidata) : null;
   const groups: Array<{
     kb: GateKB;
     candidates: ReturnType<typeof generateCandidates>;
@@ -69,6 +83,12 @@ export function runPipeline(
       kb: fdKb,
       candidates: generateFootballDataCandidates(fdKb, { today }),
       idPrefix: (_i, f) => `q_fd_${f.slice(0, 16)}`,
+    });
+  if (wdKb)
+    groups.push({
+      kb: wdKb,
+      candidates: generateWikidataCandidates(wdKb),
+      idPrefix: (_i, f) => `q_wd_${f.slice(0, 16)}`,
     });
   const seen = new Set<string>();
   const questions: Question[] = [];
@@ -137,5 +157,5 @@ export function runPipeline(
         ],
       });
     });
-  return { bank: new QuestionBank(questions), kb, conflicts, fdKb };
+  return { bank: new QuestionBank(questions), kb, conflicts, fdKb, wdKb, crossCheck };
 }

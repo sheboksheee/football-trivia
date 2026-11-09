@@ -13,6 +13,7 @@ Legend: **APPROVED** = user-confirmed (authoritative). **PROPOSED** = chosen by 
 - **Questions in Egyptian Arabic** (real-data templates), club/league names in Arabic (`providers/footballDataArabic.ts`, needs native review). Rewording keeps an approved question approved when its facts (fingerprint) are unchanged; the version is bumped and the rewording is audited.
 - **Typed answers accept Arabic or English**, ignore the Arabic article and FC/AFC-type tokens, and **tolerate spelling mistakes**: 0 typos for ≤3 letters, 1 for ≤5, 2 for ≤10, 3 above (adjacent swaps count as one). A misspelling is accepted only if it is strictly closer to the right answer than to every rival in the same question (e.g. other lineup players, other TOP 25 entries); ties match nothing. Exact matches always count.
 - **Fictional questions retired** on the demo server; games draw real questions first.
+- **Free open data added (2026-11-09, owner: "يلا")**: Wikidata (CC0, player club careers) and OpenFootball (CC0, results cross-check). StatsBomb Open Data later, private testing only. License decisions are still recorded per source in the Content Studio.
 
 ## BLOCKED — needs a product decision before code
 | Item | Why | Effect today |
@@ -23,7 +24,7 @@ Legend: **APPROVED** = user-confirmed (authoritative). **PROPOSED** = chosen by 
 | In-game kick voting policy | "eligible-majority approval" undefined. | Host can remove spectators in-game and anyone in the lobby; in-game participant kicks are refused with an explanation. |
 | Emergency-pause limits/abuse policy | GDD §16. | Unlimited, host-only, reason required, fully audited. |
 | Neutral-judge policy for 2-player rooms | GDD §16. | Judge must join as a separate non-playing member. |
-| Licensed data provider | football-data.org integrated (free plan) but its commercial-use terms are not published; needs written confirmation. | License PENDING by default; owner can mark it *Private testing* (demo/dev play) or *Commercial* (required for production) in the Content Studio. Player-level questions need the paid plan. |
+| Licensed data provider | football-data.org integrated (free plan) but its commercial-use terms are not published; needs written confirmation. Wikidata and OpenFootball are CC0 (verified). | License PENDING by default; owner can mark it *Private testing* (demo/dev play) or *Commercial* (required for production) in the Content Studio. Player-level questions need the paid plan. |
 
 ## PROPOSED — gameplay parameters awaiting approval
 
@@ -75,6 +76,8 @@ Legend: **APPROVED** = user-confirmed (authoritative). **PROPOSED** = chosen by 
 - Infrastructure safeguards (not product rules): spectator soft cap per room (`SPECTATOR_SOFT_CAP`, default 500), 10 join/resume attempts per minute per IP, 40-message burst / 20 msg/s per socket, 8 KB WebSocket frames.
 - Admin access is a single bearer token (`ADMIN_TOKEN`). Real staff auth (SSO/roles) is a launch blocker.
 - Fonts load from Google Fonts (OFL fonts, no files shipped). Privacy review may require self-hosting.
+- Wikidata club resolution picks the most-linked valid club item (never a hand mapping); a "played for" MCQ uses absence of a membership statement as the distractor test, so every such question needs human review.
+- OpenFootball disagreements quarantine the football-data.org fact; there is no automatic "majority" winner.
 - Content: fictional fixture with deterministic generator; DEV policy auto-publishes fixture content; production defaults to STRICT (human review for everything). TOP 25 lists use a documented tie-break ("fewer league starts ranks higher"); lists still tied after it are rejected.
 - Difficulty weights (Blueprint C1) and pilot calibration threshold (50 responses) used as starting hypotheses only.
 - **Language:** Egyptian colloquial Arabic ("rosh" tone) is the default UI language, with English one tap away. Every screen, mode name, rule text, error and lobby message is localised (`apps/web/src/i18n.ts`, `apps/web/src/modeText.ts`); server start-issues carry stable codes so the client can translate them. Arabic font: Cairo (Google Fonts, OFL). The copy needs a native review before launch. **Question content (prompts, players, clubs) is still English**: it comes from the fictional English-language dataset — Arabic question templates are a follow-up task.

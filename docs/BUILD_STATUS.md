@@ -1,6 +1,6 @@
 # Build Status
 
-**Status: playable vertical product (11 of 12 modes) — NOT production-ready.** Last verified 2026-11-07.
+**Status: playable vertical product (11 of 12 modes) — NOT production-ready.** Last verified 2026-11-09.
 
 ## How to verify (all passing at last run)
 ```bash
@@ -8,12 +8,12 @@ pnpm install
 pnpm typecheck          # strict TS, 0 errors
 pnpm lint               # eslint, 0 problems
 pnpm format:check       # prettier
-TEST_DATABASE_URL=postgresql://ft:ft@localhost:5432/football_trivia_test pnpm test   # 129 tests, 13 files
+TEST_DATABASE_URL=postgresql://ft:ft@localhost:5432/football_trivia_test pnpm test   # 156 tests, 16 files
 pnpm build              # web PWA + bundled server
 pnpm test:e2e           # Playwright, 6 browser tests (incl. a full Arabic game on phone + laptop) (starts its own server)
 FT_URL=ws://localhost:8787/ws SPECTATORS=300 pnpm --filter @ft/load test   # against a running server
 ```
-Without `TEST_DATABASE_URL` the 2 PostgreSQL tests are skipped (127 run).
+Without `TEST_DATABASE_URL` the 2 PostgreSQL tests are skipped (154 run).
 
 ## Phase checklist
 | Phase | State | Evidence |
@@ -43,14 +43,15 @@ Without `TEST_DATABASE_URL` the 2 PostgreSQL tests are skipped (127 run).
 1. **Who Am I? rules** (timing, input type, wrong answers, ties).
 2. **Approve or change every PROPOSED item** in `docs/DECISIONS.md` (8 modes are "Provisional").
 3. **TOP 25 tie rule** and **Pass & Play** scope.
-4. **Licensed football data**: football-data.org is integrated (results, tables, venues → Higher or Lower, Who came first, Guess the Match, MCQ, Buzzer). Verified live on 2026-11-08 (60/60 requests ok, ~940 real questions generated). Needs: the token on the deployed server (`FOOTBALL_DATA_API_KEY`), a license decision in the Content Studio, your approval of the generated questions, and written confirmation of commercial use before a public launch. Player-level modes (Missing XI, Impostor, TOP 25, Auction, Connections) need the paid plan.
+4. **Licensed football data**: football-data.org is integrated (results, tables, venues → Higher or Lower, Who came first, Guess the Match, MCQ, Buzzer). Verified live on 2026-11-08 (60/60 requests ok, ~940 real questions generated). Needs: the token on the deployed server (`FOOTBALL_DATA_API_KEY`), a license decision in the Content Studio, your approval of the generated questions, and written confirmation of commercial use before a public launch. Player-level modes: The Impostor and Connections now come from **Wikidata (CC0)**; Missing XI, TOP 25 and Auction still need line-up/scorer data (paid plan or StatsBomb Open Data for private testing). **OpenFootball (CC0)** cross-checks football-data.org scores; disagreements are quarantined.
 5. Production decisions: hosting/provider, staff authentication for the Content Studio, privacy policy & data retention, font hosting, Arabic translation review.
 
 ## Known limitations / next engineering tasks
 - Single server process owns rooms (no horizontal scaling yet); in-memory apply then async Postgres append.
 - Render blueprint now provisions a FREE PostgreSQL (expires 30 days after creation, 14-day grace to upgrade). Verified locally: license, approvals and fetched responses survive a restart and fetching resumes where it stopped.
 - Content Studio has no editing of question wording (review actions only) and no exposure/calibration dashboards.
-- UI is fully Egyptian-Arabic by default (English toggle); the questions themselves are still English (fictional dataset) — Arabic question templates are next.
+- UI and real-data questions are in Egyptian Arabic (English toggle). Player names come from Wikidata Arabic labels (Latin name when missing).
+- Wikidata membership lists can be incomplete/out of date; the Impostor context lists only clubs we fetched (the football-data.org clubs).
 - No in-game kick UI (lobby kick is a server command without UI), no chat/mute/report.
 - Spectator feed delay (anti-coaching) not implemented.
 - Capacitor packaging not started (later verified release task per START_HERE).

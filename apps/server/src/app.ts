@@ -58,7 +58,13 @@ const ReviewBody = z.object({
 
 export async function createApp(
   config: Config,
-  opts: { db?: Persistence; now?: () => number; log?: Logger; footballDataFetch?: FetchLike } = {},
+  opts: {
+    db?: Persistence;
+    now?: () => number;
+    log?: Logger;
+    footballDataFetch?: FetchLike;
+    openDataFetch?: FetchLike;
+  } = {},
 ): Promise<App> {
   const log = opts.log ?? createLogger(config.LOG_LEVEL);
   const metrics = new Metrics();
@@ -81,6 +87,10 @@ export async function createApp(
       ...fd,
       ...(opts.footballDataFetch ? { fetch: opts.footballDataFetch, minIntervalMs: 0 } : {}),
     },
+    openData: {
+      enabled: config.OPEN_DATA_ENABLED,
+      ...(opts.openDataFetch ? { fetch: opts.openDataFetch, minIntervalMs: 0 } : {}),
+    },
   });
   await content.init();
   if (fd.enabled && config.FOOTBALL_DATA_AUTO_INGEST) {
@@ -90,6 +100,8 @@ export async function createApp(
     );
     content.startIngest();
   }
+  // Open data complements football-data.org (it needs its clubs and leagues), so it runs after it.
+  if (config.OPEN_DATA_ENABLED && config.OPEN_DATA_AUTO_INGEST && fd.enabled) content.startOpenDataIngest();
   const timing =
     config.FT_TIME_SCALE === 1 ? DEFAULT_TIMING : scaleTiming(DEFAULT_TIMING, config.FT_TIME_SCALE);
   if (config.FT_TIME_SCALE !== 1)
@@ -177,7 +189,11 @@ export async function createApp(
           sources: SOURCES.length,
         });
       if (path === '/api/admin/sources' && req.method === 'GET')
-        return json(res, 200, { sources: SOURCES, footballData: content.ingestStatus() });
+        return json(res, 200, {
+          sources: SOURCES,
+          footballData: content.ingestStatus(),
+          openData: content.openDataStatus(),
+        });
       const lic = /^\/api\/admin\/sources\/([\w-]+)\/license$/.exec(path);
       if (lic && req.method === 'POST') {
         const body = LicenseBody.safeParse(await readBody(req).catch(() => null));
@@ -203,6 +219,18 @@ export async function createApp(
           return json(res, 409, { error: e instanceof Error ? e.message : 'Cannot ingest' });
         }
       }
+      if (path === '/api/admin/open-data/ingest' && req.method === 'POST') {
+        try {
+          const body = (await readBody(req).catch(() => ({}))) as { refresh?: boolean };
+          return json(res, 202, {
+            openData: content.startOpenDataIngest({ refresh: body?.refresh === true }),
+          });
+        } catch (e) {
+          return json(res, 409, { error: e instanceof Error ? e.message : 'Cannot ingest' });
+        }
+      }
+      if (path === '/api/admin/open-data/cross-check')
+        return json(res, 200, { crossCheck: content.result.crossCheck });
       if (path === '/api/admin/questions/bulk-review' && req.method === 'POST') {
         const body = BulkBody.safeParse(await readBody(req).catch(() => null));
         if (!body.success) return json(res, 400, { error: body.error.issues[0]?.message ?? 'Invalid body' });
@@ -250,10 +278,14 @@ export async function createApp(
         if (!q) return json(res, 404, { error: 'Not found' });
         if (!m[2] && req.method === 'GET') {
           const facts = q.factIds.slice(0, 60).map((id) => {
-            const f = content.result.kb.factIndex.get(id) ?? content.result.fdKb?.factIndex.get(id);
+            const f =
+              content.result.kb.factIndex.get(id) ??
+              content.result.fdKb?.factIndex.get(id) ??
+              content.result.wdKb?.factIndex.get(id);
             const snap = f
               ? (content.result.kb.snapshots.get(f.evidenceId) ??
-                content.result.fdKb?.snapshots.get(f.evidenceId))
+                content.result.fdKb?.snapshots.get(f.evidenceId) ??
+                content.result.wdKb?.snapshots.get(f.evidenceId))
               : undefined;
             return f
               ? {

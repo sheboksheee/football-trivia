@@ -4,6 +4,8 @@ export const SYNTHETIC_SOURCE_ID = 'src_synthetic_dev_league';
 export const CROSSCHECK_SOURCE_ID = 'src_synthetic_crosscheck';
 export const PENDING_SOURCE_ID = 'src_synthetic_pending_rights';
 export const FOOTBALL_DATA_SOURCE_ID = 'src_football_data_org';
+export const WIKIDATA_SOURCE_ID = 'src_wikidata';
+export const OPENFOOTBALL_SOURCE_ID = 'src_openfootball';
 
 /**
  * Source registry. Real-world providers are listed as CANDIDATES only (docs/DATA_SOURCES.md):
@@ -63,6 +65,33 @@ export const SOURCES: SourceRecord[] = [
     notes:
       'Free plan (verified on the pricing page, 2026-11-08): 12 competitions, results, fixtures, league tables, 10 calls/minute. Line-ups, scorers and squads need a paid plan. Commercial-use terms are not published online: confirm in writing before a public launch.',
   },
+  {
+    id: WIKIDATA_SOURCE_ID,
+    name: 'Wikidata (club careers of footballers)',
+    kind: 'OPEN_DATASET',
+    // CC0 1.0, but the decision is still recorded by a human (Content Studio -> Sources).
+    licenseStatus: 'PENDING',
+    allowedUses: [],
+    attribution: 'Player and club data from Wikidata (CC0 1.0)',
+    termsUrl: 'https://www.wikidata.org/wiki/Wikidata:Licensing',
+    autoApproveEligible: false,
+    integrated: true,
+    notes:
+      'Structured data is CC0 1.0 (verified on Wikidata:Licensing, 2026-11-09): commercial use allowed, attribution not required. Community-edited: every generated question needs human review; membership statements can be incomplete or out of date.',
+  },
+  {
+    id: OPENFOOTBALL_SOURCE_ID,
+    name: 'OpenFootball football.json (results cross-check)',
+    kind: 'OPEN_DATASET',
+    licenseStatus: 'PENDING',
+    allowedUses: [],
+    attribution: 'Match results cross-checked with OpenFootball (CC0 1.0)',
+    termsUrl: 'https://github.com/openfootball/football.json',
+    autoApproveEligible: false,
+    integrated: true,
+    notes:
+      'Public domain (CC0 1.0, LICENSE.md verified 2026-11-09). Used only to corroborate football-data.org full-time scores: a disagreement quarantines the affected questions.',
+  },
   ...(
     [
       ['src_cand_sportmonks', 'Sportmonks Football API', 'LICENSED_API', 'https://www.sportmonks.com/'],
@@ -75,13 +104,6 @@ export const SOURCES: SourceRecord[] = [
         'OPEN_DATASET',
         'https://github.com/statsbomb/open-data',
       ],
-      [
-        'src_cand_openfootball',
-        'OpenFootball football.json',
-        'OPEN_DATASET',
-        'https://github.com/openfootball/football.json',
-      ],
-      ['src_cand_wikidata', 'Wikidata (identity & aliases)', 'OPEN_DATASET', 'https://www.wikidata.org/'],
     ] as const
   ).map(([id, name, kind, url]): SourceRecord => ({
     id,

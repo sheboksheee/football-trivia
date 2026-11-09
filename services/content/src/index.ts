@@ -12,3 +12,5 @@ export type { Candidate } from './generators/index.js';
 export { generateCandidates } from './generators/index.js';
 export * from './providers/footballData.js';
 export * from './providers/footballDataContent.js';
+export * from './providers/wikidata.js';
+export * from './providers/openFootball.js';

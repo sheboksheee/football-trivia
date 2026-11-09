@@ -499,25 +499,33 @@ function Detail({
 function Sources({ api }: { api: ReturnType<typeof useAdmin> }) {
   const [s, setS] = useState<any[] | null>(null);
   const [fd, setFd] = useState<any>(null);
+  const [od, setOd] = useState<any>(null);
   const load = useCallback(() => {
     api('/sources')
       .then((r) => {
         setS(r.sources);
         setFd(r.footballData);
+        setOd(r.openData);
       })
       .catch(() => setS([]));
   }, [api]);
   useEffect(load, [load]);
   useEffect(() => {
-    if (!fd?.running) return;
+    if (!fd?.running && !od?.running) return;
     const t = setInterval(load, 3000);
     return () => clearInterval(t);
-  }, [fd?.running, load]);
+  }, [fd?.running, od?.running, load]);
   if (!s) return <Skeleton h={200} />;
   const real = s.find((x) => x.id === 'src_football_data_org');
   return (
     <div className="stack">
       {real && <FootballDataPanel api={api} source={real} status={fd} onChange={load} />}
+      <OpenDataPanel
+        api={api}
+        sources={s.filter((x) => x.id === 'src_wikidata' || x.id === 'src_openfootball')}
+        status={od}
+        onChange={load}
+      />
       <section className="card">
         <div className="table-wrap">
           <table className="table">
@@ -572,38 +580,7 @@ function FootballDataPanel({
   status: any;
   onChange: () => void;
 }) {
-  const current: 'PENDING' | 'TESTING' | 'COMMERCIAL' | 'DENIED' =
-    source.licenseStatus !== 'APPROVED'
-      ? source.licenseStatus
-      : source.allowedUses.includes('COMMERCIAL_REDISTRIBUTION')
-        ? 'COMMERCIAL'
-        : 'TESTING';
-  const [decision, setDecision] = useState(current);
-  const LABEL = {
-    PENDING: 'Pending',
-    TESTING: 'Private testing',
-    COMMERCIAL: 'Commercial',
-    DENIED: 'Denied',
-  } as const;
-  const unchanged = decision === current;
-  const [note, setNote] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
-  const save = async () => {
-    const body =
-      decision === 'TESTING'
-        ? { status: 'APPROVED', allowedUses: ['GAMEPLAY'] }
-        : decision === 'COMMERCIAL'
-          ? { status: 'APPROVED', allowedUses: ['GAMEPLAY', 'COMMERCIAL_REDISTRIBUTION'] }
-          : { status: decision, allowedUses: [] };
-    try {
-      await api(`/sources/${source.id}/license`, { method: 'POST', body: JSON.stringify({ ...body, note }) });
-      setMsg('Saved. Questions were re-checked against the new license.');
-      setNote('');
-      onChange();
-    } catch (e) {
-      setMsg((e as Error).message);
-    }
-  };
   const ingest = async () => {
     try {
       await api('/football-data/ingest', { method: 'POST', body: '{}' });
@@ -660,6 +637,55 @@ function FootballDataPanel({
           The server could not reach api.football-data.org (network). Try again later.
         </Banner>
       )}
+      <LicenseControl api={api} source={source} onChange={onChange} />
+      {msg && <span className="small muted">{msg}</span>}
+    </section>
+  );
+}
+
+function LicenseControl({
+  api,
+  source,
+  onChange,
+}: {
+  api: ReturnType<typeof useAdmin>;
+  source: any;
+  onChange: () => void;
+}) {
+  const current: 'PENDING' | 'TESTING' | 'COMMERCIAL' | 'DENIED' =
+    source.licenseStatus !== 'APPROVED'
+      ? source.licenseStatus
+      : source.allowedUses.includes('COMMERCIAL_REDISTRIBUTION')
+        ? 'COMMERCIAL'
+        : 'TESTING';
+  const [decision, setDecision] = useState(current);
+  const LABEL = {
+    PENDING: 'Pending',
+    TESTING: 'Private testing',
+    COMMERCIAL: 'Commercial',
+    DENIED: 'Denied',
+  } as const;
+  const unchanged = decision === current;
+  const [note, setNote] = useState('');
+  const [msg, setMsg] = useState<string | null>(null);
+  const save = async () => {
+    const body =
+      decision === 'TESTING'
+        ? { status: 'APPROVED', allowedUses: ['GAMEPLAY'] }
+        : decision === 'COMMERCIAL'
+          ? { status: 'APPROVED', allowedUses: ['GAMEPLAY', 'COMMERCIAL_REDISTRIBUTION'] }
+          : { status: decision, allowedUses: [] };
+    try {
+      await api(`/sources/${source.id}/license`, { method: 'POST', body: JSON.stringify({ ...body, note }) });
+      setMsg('Saved. Questions were re-checked against the new license.');
+      setNote('');
+      onChange();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  };
+  return (
+    <>
       <div className="field">
         <span className="label">License decision (recorded with your note in an audit trail)</span>
         <div className="seg" role="group" aria-label="License decision">
@@ -709,6 +735,81 @@ function FootballDataPanel({
           ))}
         </ul>
       )}
+    </>
+  );
+}
+
+function OpenDataPanel({
+  api,
+  sources,
+  status,
+  onChange,
+}: {
+  api: ReturnType<typeof useAdmin>;
+  sources: any[];
+  status: any;
+  onChange: () => void;
+}) {
+  const [msg, setMsg] = useState<string | null>(null);
+  const ingest = async () => {
+    try {
+      await api('/open-data/ingest', { method: 'POST', body: '{}' });
+      onChange();
+    } catch (e) {
+      setMsg((e as Error).message);
+    }
+  };
+  const last = status?.lastReport;
+  const cc = status?.crossCheck;
+  return (
+    <section className="card stack">
+      <h2 className="display h3" style={{ margin: 0 }}>
+        Open data (CC0): Wikidata + OpenFootball
+      </h2>
+      <p className="small muted" style={{ margin: 0 }}>
+        Wikidata adds club careers of well-known players (Impostor, Connections, “which club did he play
+        for?”). OpenFootball re-reports league results: any score that disagrees with football-data.org is
+        quarantined automatically.
+      </p>
+      {!status?.enabled ? (
+        <Banner tone="warn">Disabled on this server (OPEN_DATA_ENABLED=false).</Banner>
+      ) : (
+        <div className="row small">
+          <span className={`badge ${status.running ? 'info' : 'ok'}`}>
+            {status.running ? 'Fetching…' : 'Idle'}
+          </span>
+          <span>
+            {status.snapshots.wikidata} Wikidata · {status.snapshots.openFootball} OpenFootball responses
+          </span>
+          <span className="spacer" />
+          <button className="btn sm" disabled={status.running} onClick={ingest}>
+            Fetch missing data
+          </button>
+        </div>
+      )}
+      {last && (
+        <p className="small muted" style={{ margin: 0 }}>
+          Last run {status.lastRunAt?.slice(0, 16).replace('T', ' ')}: Wikidata {last.wikidata.added} new (
+          {last.wikidata.calls} calls), OpenFootball {last.openFootball.added} new
+          {[...last.wikidata.skipped, ...last.openFootball.skipped].length > 0 &&
+            ` · skipped: ${[...new Set([...last.wikidata.skipped, ...last.openFootball.skipped].map((x: any) => x.reason))].join(', ')}`}
+          {last.error && ` · error: ${last.error}`}
+        </p>
+      )}
+      {cc && (
+        <Banner tone={cc.conflicts ? 'warn' : 'ok'}>
+          Cross-check: {cc.compared} matches compared, {cc.agreed} agree, {cc.conflicts} disagree
+          (quarantined)
+          {cc.unmatchedTeams.length > 0 && ` · unmatched names: ${cc.unmatchedTeams.slice(0, 6).join(', ')}`}
+        </Banner>
+      )}
+      {sources.map((src) => (
+        <div key={src.id} className="stack" style={{ gap: 8 }}>
+          <strong className="small">{src.name}</strong>
+          <LicenseControl api={api} source={src} onChange={onChange} />
+        </div>
+      ))}
+      {msg && <span className="small muted">{msg}</span>}
     </section>
   );
 }

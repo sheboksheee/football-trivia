@@ -3,6 +3,7 @@ import pino from 'pino';
 import { loadConfig } from '../src/config.js';
 import { createApp, type App } from '../src/app.js';
 import { fakeApi } from '../../../services/content/test/fdFake.js';
+import { fakeWikidata } from '../../../services/content/test/wdFake.js';
 
 const apps: App[] = [];
 afterAll(async () => {
@@ -20,7 +21,7 @@ async function boot(env: Record<string, string>) {
       FOOTBALL_DATA_SEASONS: '2024,2025',
       ...env,
     } as NodeJS.ProcessEnv),
-    { log: pino({ level: 'silent' }), footballDataFetch: api.f },
+    { log: pino({ level: 'silent' }), footballDataFetch: api.f, openDataFetch: fakeWikidata().f },
   );
   apps.push(app);
   const port = await app.listen(0, '127.0.0.1');

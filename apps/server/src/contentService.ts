@@ -3,6 +3,11 @@ import {
   DEV_POLICY,
   FOOTBALL_DATA_SOURCE_ID,
   FootballDataClient,
+  OPENFOOTBALL_SOURCE_ID,
+  WIKIDATA_SOURCE_ID,
+  WikidataClient,
+  ingestOpenFootball,
+  ingestWikidata,
   fixtureSnapshots,
   generateLeague,
   hasCommercialRights,
@@ -45,11 +50,32 @@ export interface FootballDataSettings {
   minIntervalMs?: number;
 }
 
+export interface OpenDataSettings {
+  /** Wikidata (club careers) + OpenFootball (results cross-check), both CC0. */
+  enabled: boolean;
+  fetch?: FetchLike;
+  minIntervalMs?: number;
+}
+
+export interface OpenDataStatus {
+  enabled: boolean;
+  running: boolean;
+  lastRunAt: string | null;
+  lastReport: {
+    wikidata: { added: number; calls: number; skipped: Array<{ what: string; reason: string }> };
+    openFootball: { added: number; calls: number; skipped: Array<{ what: string; reason: string }> };
+    error: string | null;
+  } | null;
+  snapshots: { wikidata: number; openFootball: number };
+  crossCheck: { compared: number; agreed: number; conflicts: number; unmatchedTeams: string[] } | null;
+}
+
 export interface ContentOptions {
   strict: boolean;
   /** Production launches only draw from sources with COMMERCIAL_REDISTRIBUTION rights. */
   requireCommercialRights: boolean;
   footballData?: FootballDataSettings;
+  openData?: OpenDataSettings;
 }
 
 export interface IngestStatus {
@@ -66,7 +92,14 @@ export class ContentService {
   bank!: QuestionBank;
   result!: PipelineResult;
   private fdSnapshots: RawSnapshot[] = [];
+  private wdSnapshots: RawSnapshot[] = [];
+  private ofSnapshots: RawSnapshot[] = [];
   private ingest: IngestStatus;
+  private open: { running: boolean; lastRunAt: string | null; lastReport: OpenDataStatus['lastReport'] } = {
+    running: false,
+    lastRunAt: null,
+    lastReport: null,
+  };
 
   constructor(
     private readonly db: Persistence,
@@ -88,6 +121,8 @@ export class ContentService {
   async init() {
     for (const s of await this.db.loadSources()) restoreSourceLicense(s);
     this.fdSnapshots = await this.db.loadSnapshots(FOOTBALL_DATA_SOURCE_ID);
+    this.wdSnapshots = await this.db.loadSnapshots(WIKIDATA_SOURCE_ID);
+    this.ofSnapshots = await this.db.loadSnapshots(OPENFOOTBALL_SOURCE_ID);
     await this.rebuild();
     await this.db.saveSources(SOURCES);
     if (this.db.kind === 'postgres') await this.db.saveSnapshots(fixtureSnapshots(generateLeague()));
@@ -101,6 +136,8 @@ export class ContentService {
     const t = Date.now();
     this.result = runPipeline(this.o.strict ? STRICT_POLICY : DEV_POLICY, undefined, {
       footballData: this.fdSnapshots,
+      wikidata: this.wdSnapshots,
+      openFootball: this.ofSnapshots,
     });
     const bank = this.result.bank;
     const stored = await this.db.loadQuestions();
@@ -165,6 +202,11 @@ export class ContentService {
         restored,
         footballDataSnapshots: this.fdSnapshots.length,
         invalidProviderPayloads: this.result.fdKb?.invalid.length ?? 0,
+        wikidataSnapshots: this.wdSnapshots.length,
+        openFootballSnapshots: this.ofSnapshots.length,
+        crossCheck: this.result.crossCheck
+          ? { compared: this.result.crossCheck.compared, conflicts: this.result.crossCheck.conflicts.length }
+          : null,
       },
       'content bank ready',
     );
@@ -330,6 +372,107 @@ export class ContentService {
         this.ingest.lastRunAt = new Date().toISOString();
       });
     return this.ingestStatus();
+  }
+
+  openDataStatus(): OpenDataStatus {
+    const cc = this.result?.crossCheck;
+    return {
+      enabled: !!this.o.openData?.enabled,
+      ...this.open,
+      snapshots: { wikidata: this.wdSnapshots.length, openFootball: this.ofSnapshots.length },
+      crossCheck: cc
+        ? {
+            compared: cc.compared,
+            agreed: cc.agreed,
+            conflicts: cc.conflicts.length,
+            unmatchedTeams: cc.unmatchedTeams,
+          }
+        : null,
+    };
+  }
+
+  /**
+   * Fetches Wikidata club careers for the football-data.org clubs we know, and OpenFootball files
+   * for the configured league seasons, in the background (after any football-data run finishes).
+   */
+  startOpenDataIngest(opts: { refresh?: boolean } = {}): OpenDataStatus {
+    const od = this.o.openData;
+    if (!od?.enabled) throw new Error('Open-data ingestion is not enabled on this server');
+    if (this.open.running) return this.openDataStatus();
+    this.open.running = true;
+    const run = async () => {
+      while (this.ingest.running) await new Promise((r) => setTimeout(r, 200));
+      const fdKb = this.result.fdKb;
+      const league = new Map<string, string>();
+      for (const t of fdKb?.tables ?? []) for (const r of t.rows) league.set(r.team, t.competitionCode);
+      const teams = [...(fdKb?.teams.values() ?? [])]
+        .map((t) => ({
+          fdId: Number(t.entityId.replace('fd_team_', '')),
+          name: t.name,
+          shortName: t.shortName,
+          competitionCode: league.get(t.entityId) ?? null,
+        }))
+        .filter((t) => Number.isInteger(t.fdId))
+        .sort((a, b) => a.fdId - b.fdId);
+      const wdHave = new Map(this.wdSnapshots.map((s) => [s.id, s]));
+      const client = new WikidataClient({
+        ...(od.fetch ? { fetch: od.fetch } : {}),
+        ...(od.minIntervalMs !== undefined ? { minIntervalMs: od.minIntervalMs } : {}),
+      });
+      let since = 0;
+      const absorbWd = async (snap: RawSnapshot) => {
+        await this.db.saveSnapshots([snap]);
+        this.wdSnapshots = [...this.wdSnapshots.filter((x) => x.id !== snap.id), snap];
+        if (snap.recordType === 'wd_club_players' && ++since >= 10) {
+          since = 0;
+          await this.rebuild();
+        }
+      };
+      const wd = await ingestWikidata(client, {
+        teams,
+        have: wdHave,
+        refresh: !!opts.refresh,
+        onSnapshot: absorbWd,
+        onProgress: (msg) => this.log.info({ msg }, 'wikidata ingest'),
+      });
+      const of = await ingestOpenFootball({
+        competitions: this.o.footballData?.competitions ?? [],
+        seasons: this.o.footballData?.seasons ?? [],
+        have: new Set(this.ofSnapshots.map((s) => s.id)),
+        refresh: !!opts.refresh,
+        ...(od.fetch ? { fetch: od.fetch } : {}),
+        onSnapshot: async (snap) => {
+          await this.db.saveSnapshots([snap]);
+          this.ofSnapshots = [...this.ofSnapshots.filter((x) => x.id !== snap.id), snap];
+        },
+      });
+      await this.rebuild();
+      this.open.lastReport = {
+        wikidata: { added: wd.snapshots.length, calls: wd.calls, skipped: wd.skipped },
+        openFootball: { added: of.snapshots.length, calls: of.calls, skipped: of.skipped },
+        error: null,
+      };
+    };
+    void run()
+      .catch((err: unknown) => {
+        this.log.error({ err }, 'open-data ingest failed');
+        this.open.lastReport = {
+          wikidata: { added: 0, calls: 0, skipped: [] },
+          openFootball: { added: 0, calls: 0, skipped: [] },
+          error: err instanceof Error ? err.message : 'failed',
+        };
+      })
+      .finally(() => {
+        this.open.running = false;
+        this.open.lastRunAt = new Date().toISOString();
+      });
+    return this.openDataStatus();
+  }
+
+  /** Test helper: resolves when the open-data run has finished. */
+  async waitForOpenData(timeoutMs = 10_000) {
+    const start = Date.now();
+    while (this.open.running && Date.now() - start < timeoutMs) await new Promise((r) => setTimeout(r, 20));
   }
 
   /** Test helper: resolves when the current ingestion run has finished. */

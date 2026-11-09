@@ -35,6 +35,15 @@ const Env = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
+  /** Wikidata + OpenFootball (CC0) ingestion, for the clubs/leagues football-data.org provides. */
+  OPEN_DATA_ENABLED: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
+  OPEN_DATA_AUTO_INGEST: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
 });
 
 /** Season start years: current season (started in August or later) plus the three before it. */
