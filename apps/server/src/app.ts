@@ -92,16 +92,31 @@ export async function createApp(
       ...(opts.openDataFetch ? { fetch: opts.openDataFetch, minIntervalMs: 0 } : {}),
     },
   });
-  await content.init();
-  if (fd.enabled && config.FOOTBALL_DATA_AUTO_INGEST) {
-    log.info(
-      { competitions: fd.competitions, seasons: fd.seasons },
-      'football-data.org: fetching missing records in the background',
-    );
-    content.startIngest();
+  const startIngests = () => {
+    if (fd.enabled && config.FOOTBALL_DATA_AUTO_INGEST) {
+      log.info(
+        { competitions: fd.competitions, seasons: fd.seasons },
+        'football-data.org: fetching missing records in the background',
+      );
+      content.startIngest();
+    }
+    // Open data complements football-data.org (it needs its clubs and leagues), so it runs after it.
+    if (config.OPEN_DATA_ENABLED && config.OPEN_DATA_AUTO_INGEST && fd.enabled) content.startOpenDataIngest();
+  };
+  if (opts.deferContentInit) {
+    // Production boot: open the port first (hosting health checks), build the bank in the background.
+    const t = Date.now();
+    void content
+      .init()
+      .then(() => {
+        log.info({ ms: Date.now() - t }, 'content ready');
+        startIngests();
+      })
+      .catch((err: unknown) => log.error({ err }, 'content init failed'));
+  } else {
+    await content.init();
+    startIngests();
   }
-  // Open data complements football-data.org (it needs its clubs and leagues), so it runs after it.
-  if (config.OPEN_DATA_ENABLED && config.OPEN_DATA_AUTO_INGEST && fd.enabled) content.startOpenDataIngest();
   const timing =
     config.FT_TIME_SCALE === 1 ? DEFAULT_TIMING : scaleTiming(DEFAULT_TIMING, config.FT_TIME_SCALE);
   if (config.FT_TIME_SCALE !== 1)
@@ -167,7 +182,12 @@ export async function createApp(
       path: path.startsWith('/api/admin') ? '/api/admin' : path.startsWith('/api') ? path : 'static',
     });
     if (path === '/healthz')
-      return json(res, 200, { ok: true, uptimeSec: Math.round(process.uptime()), storage: db.kind });
+      return json(res, 200, {
+        ok: true,
+        uptimeSec: Math.round(process.uptime()),
+        storage: db.kind,
+        contentReady: content.ready,
+      });
     if (path === '/readyz') return json(res, 200, { ok: true, rooms: manager.roomCount() });
     if (path === '/metrics') {
       res.writeHead(200, { 'content-type': 'text/plain; version=0.0.4' });
@@ -181,6 +201,8 @@ export async function createApp(
       });
     if (path.startsWith('/api/admin/')) {
       if (!isAdmin(req)) return json(res, 401, { error: 'Admin token required' });
+      if (!content.ready)
+        return json(res, 503, { error: 'The question bank is still loading, try again in a minute' });
       const bank = content.bank;
       if (path === '/api/admin/summary' && req.method === 'GET')
         return json(res, 200, {

@@ -111,4 +111,32 @@ describe('open data (Wikidata + OpenFootball) through the server', () => {
     expect(detail.body.facts[0].sourceId).toBe(WIKIDATA_SOURCE_ID);
     expect(detail.body.facts[0].evidence.recordType).toBe('wd_club_players');
   });
+
+  it('production boot opens the port before the question bank is built', async () => {
+    const app = await createApp(
+      loadConfig({ LOG_LEVEL: 'silent', ADMIN_TOKEN: 'admin-test-token' } as NodeJS.ProcessEnv),
+      {
+        log: pino({ level: 'silent' }),
+        deferContentInit: true,
+      },
+    );
+    apps.push(app);
+    const port = await app.listen(0, '127.0.0.1');
+    const base = `http://127.0.0.1:${port}`;
+    const first = (await (await fetch(`${base}/healthz`)).json()) as { ok: boolean; contentReady: boolean };
+    expect(first.ok).toBe(true);
+    if (!first.contentReady) {
+      const r = await fetch(`${base}/api/admin/summary`, {
+        headers: { authorization: 'Bearer admin-test-token' },
+      });
+      expect(r.status).toBe(503);
+    }
+    const start = Date.now();
+    while (!app.content.ready && Date.now() - start < 20_000) await new Promise((r) => setTimeout(r, 50));
+    expect(app.content.ready).toBe(true);
+    const modes = (await (await fetch(`${base}/api/modes`)).json()) as {
+      availability: Record<string, unknown>;
+    };
+    expect(Object.keys(modes.availability).length).toBeGreaterThan(0);
+  });
 });

@@ -2,7 +2,7 @@ import { loadConfig } from './config.js';
 import { createApp } from './app.js';
 
 const config = loadConfig();
-const app = await createApp(config);
+const app = await createApp(config, { deferContentInit: true });
 const port = await app.listen();
 app.log.info({ port, storage: app.db.kind }, 'Football Trivia server listening');
 

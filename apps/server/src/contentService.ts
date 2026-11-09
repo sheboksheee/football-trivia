@@ -11,6 +11,7 @@ import {
   fixtureSnapshots,
   generateLeague,
   hasCommercialRights,
+  ReviewError,
   ingestFootballData,
   restoreSourceLicense,
   runPipeline,
@@ -91,6 +92,8 @@ export interface IngestStatus {
 export class ContentService {
   bank!: QuestionBank;
   result!: PipelineResult;
+  /** False while the bank is being built at boot (the HTTP port is already open). */
+  ready = false;
   private fdSnapshots: RawSnapshot[] = [];
   private wdSnapshots: RawSnapshot[] = [];
   private ofSnapshots: RawSnapshot[] = [];
@@ -124,6 +127,7 @@ export class ContentService {
     this.wdSnapshots = await this.db.loadSnapshots(WIKIDATA_SOURCE_ID);
     this.ofSnapshots = await this.db.loadSnapshots(OPENFOOTBALL_SOURCE_ID);
     await this.rebuild();
+    this.ready = true;
     await this.db.saveSources(SOURCES);
     if (this.db.kind === 'postgres') await this.db.saveSnapshots(fixtureSnapshots(generateLeague()));
   }
@@ -222,6 +226,7 @@ export class ContentService {
     seed: number,
     used: Set<string>,
   ): { content: ContentItem[][]; tiebreak: McqItem[] } {
+    if (!this.ready) throw new ReviewError('The question bank is still loading, try again in a minute');
     const rng = createRng(seed);
     const content = modes.map((k) => {
       const engine = engineFor(k);
@@ -260,6 +265,7 @@ export class ContentService {
 
   /** Published, playable questions per mode, and how many a game needs for 2–6 players. */
   availability(): Record<string, { published: number; needed: Record<number, number> }> {
+    if (!this.ready) return {};
     const pub = this.bank.all().filter((q) => q.status === 'PUBLISHED' && this.allowedForPlay(q));
     return Object.fromEntries(
       Object.values(MODES).map((m) => {
