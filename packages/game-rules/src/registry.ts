@@ -12,8 +12,8 @@ import { buzzerEngine } from './modes/buzzer.js';
 import { impostorEngine } from './modes/impostor.js';
 import { auctionEngine } from './modes/auction.js';
 import { tiebreakEngine } from './modes/tiebreak.js';
+import { whoAmIEngine } from './modes/whoAmI.js';
 
-/** Who Am I? is intentionally absent: its rules are BLOCKED pending product decisions. */
 export const ENGINES: Partial<Record<ModeKey, Engine>> = {
   higher_lower: higherLowerEngine as unknown as Engine,
   last_man_standing: lastManStandingEngine as unknown as Engine,
@@ -26,6 +26,7 @@ export const ENGINES: Partial<Record<ModeKey, Engine>> = {
   buzzer: buzzerEngine as unknown as Engine,
   impostor: impostorEngine as unknown as Engine,
   auction: auctionEngine as unknown as Engine,
+  who_am_i: whoAmIEngine as unknown as Engine,
 };
 
 export const TIEBREAK_ENGINE = tiebreakEngine as unknown as Engine;

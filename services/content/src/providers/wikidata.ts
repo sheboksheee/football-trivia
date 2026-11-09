@@ -21,7 +21,7 @@ import type { Candidate } from '../generators/index.js';
 import { snapshot } from '../fixture.js';
 import type { Entity, Fact, GateResult, RawSnapshot } from '../model.js';
 import { WIKIDATA_SOURCE_ID } from '../sources.js';
-import { CLUB_AR } from './footballDataArabic.js';
+import { CLUB_AR, COMPETITION_AR } from './footballDataArabic.js';
 import type { FetchLike } from './footballData.js';
 
 export const WD_SPARQL_URL = 'https://query.wikidata.org/sparql';
@@ -728,6 +728,163 @@ export function generateWikidataCandidates(kb: WdKB, o: WdGenOptions = {}): Cand
       },
       secretStrings: [p.en, ...(p.ar ? [p.ar] : [])],
       preRevealText: [`${names.join(' ')}`],
+    });
+  }
+  // ---- Who Am I?: five clues, hardest first, drawn from a varied pool so no two players feel the
+  // same. Every clue is derived from verified membership facts (or the label itself for name hints).
+  const today = new Date().toISOString().slice(0, 10);
+  const overlap = (a: WdSpell, b: WdSpell) =>
+    !!a.from && !!b.from && a.from <= (b.to ?? today) && b.from <= (a.to ?? today);
+  const tokens = (x: string) =>
+    new Set(
+      normalizeAnswer(x)
+        .split(' ')
+        .filter((t) => t.length > 2),
+    );
+  const leagueOf = (club: string) =>
+    [...kb.clubs.values()].find((c) => c.entityId === club)?.competitionCode ?? null;
+  for (const p of players.filter((x) => x.sitelinks >= impMin)) {
+    const rng = seedOf(`wai:${p.qid}`);
+    const pick = <T>(xs: T[]) => xs[Math.floor(rng() * xs.length)];
+    const clubs = clubsOf(p).sort();
+    if (clubs.length < 2) continue; // too little to build five distinct clues
+    const name = playerName(p);
+    const own = new Set([...tokens(p.en), ...(p.ar ? tokens(p.ar) : [])]);
+    type Clue = { text: string; facts: string[]; clubs: string[]; nat?: boolean; initial?: boolean };
+    // A famous teammate: overlapping spell at the same club, no shared name token (no leaks).
+    const mates: Array<{ mate: WdPlayer; club: string; facts: string[] }> = [];
+    for (const sp of p.spells)
+      for (const q of players)
+        if (q !== p && q.sitelinks >= impMin && ![...tokens(q.en)].some((t) => own.has(t)))
+          for (const sq of q.spells)
+            if (sq.club === sp.club && overlap(sp, sq))
+              mates.push({ mate: q, club: sp.club, facts: [sp.factId, sq.factId] });
+    mates.sort((a, b) => b.mate.sitelinks - a.mate.sitelinks);
+    const mate = mates.length ? mates[Math.floor(rng() * Math.min(3, mates.length))]! : null;
+    const leagues = [...new Set(clubs.map(leagueOf).filter((x): x is string => !!x && !!COMPETITION_AR[x]))];
+    const spellsWithYear = p.spells.filter((x) => x.from);
+    const hard: Clue[] = [
+      ...(mate
+        ? [{ text: `لعب جنب ${playerName(mate.mate)} في نفس الفريق`, facts: mate.facts, clubs: [] }]
+        : []),
+      ...(leagues.length >= 2
+        ? [
+            {
+              text: `لعب لنوادي في ${leagues
+                .slice(0, 2)
+                .map((l) => COMPETITION_AR[l])
+                .join(' و')}`,
+              facts: [],
+              clubs: [],
+            },
+          ]
+        : leagues.length === 1
+          ? [{ text: `لعب لنادي من نوادي ${COMPETITION_AR[leagues[0]!]}`, facts: [], clubs: [] }]
+          : []),
+    ];
+    const medium: Clue[] = [
+      ...(p.nationalityAr || p.nationality
+        ? [{ text: `بيلعب لمنتخب ${p.nationalityAr ?? p.nationality}`, facts: [], clubs: [], nat: true }]
+        : []),
+      ...spellsWithYear.map((x) => {
+        const decade = Math.floor(Number(x.from!.slice(0, 4)) / 10) * 10;
+        return {
+          text: `انضم لـ${clubName(x.club)} في وقت ما بين ${decade} و${decade + 9}`,
+          facts: [x.factId],
+          clubs: [x.club],
+        };
+      }),
+    ];
+    const easy: Clue[] = spellsWithYear.map((x) => ({
+      text: `انضم لـ${clubName(x.club)} سنة ${x.from!.slice(0, 4)}`,
+      facts: [x.factId],
+      clubs: [x.club],
+    }));
+    const clubClues: Clue[] = clubs.map((c) => ({
+      text: `لعب كمان في ${clubName(c)}`,
+      facts: p.spells.filter((x) => x.club === c).map((x) => x.factId),
+      clubs: [c],
+    }));
+    const first = [...name].find((ch) => /\p{L}/u.test(ch)) ?? '';
+    const last = name.split(' ').filter(Boolean).at(-1) ?? name;
+    const nameClues: Clue[] = [
+      { text: `اسمه بيبدأ بحرف «${first}»`, facts: [], clubs: [], initial: true },
+      {
+        text: `اسمه الأخير ${[...last].length} حروف وبيبدأ بـ«${[...last][0] ?? ''}»`,
+        facts: [],
+        clubs: [],
+        initial: true,
+      },
+    ];
+    const chosen: Clue[] = [];
+    const usedClubs = new Set<string>();
+    const take = (pool: Clue[]) => {
+      const fresh = pool.filter((c) => !chosen.includes(c) && c.clubs.every((x) => !usedClubs.has(x)));
+      const c = pick(fresh);
+      if (!c) return false;
+      chosen.push(c);
+      c.clubs.forEach((x) => usedClubs.add(x));
+      return true;
+    };
+    take(hard.length ? hard : medium);
+    take(medium);
+    take(easy.length ? easy : clubClues);
+    if (!take(clubClues) && !take(easy)) take(medium);
+    take(nameClues);
+    if (chosen.length < 5) continue;
+    // Uniqueness among every fetched player: same national team (if used), all named clubs, initial.
+    const natUsed = chosen.some((c) => c.nat);
+    const named = [...usedClubs];
+    const initial = chosen.some((c) => c.initial);
+    const others = allPlayers.filter((q) => {
+      if (q === p) return false;
+      if (natUsed && q.nationality !== p.nationality) return false;
+      if (!named.every((c) => clubsOf(q).includes(c))) return false;
+      if (initial && [...playerName(q)][0] !== [...name][0]) return false;
+      return true;
+    });
+    const e = kb.entities.get(p.entityId)!;
+    const rivals = allPlayers
+      .filter((q) => q !== p && q.nationality === p.nationality)
+      .slice(0, 30)
+      .flatMap((q) => [q.en, ...(q.ar ? [q.ar] : [])]);
+    out.push({
+      kind: 'who_am_i',
+      template: 'wd.wai.player',
+      item: {
+        kind: 'who_am_i',
+        clues: chosen.map((c) => c.text) as [string, string, string, string, string],
+        answer: name,
+        aliases: e.aliases,
+        rivals,
+      },
+      factIds: [...new Set([...chosen.flatMap((c) => c.facts), ...p.spells.map((x) => x.factId)])],
+      entityIds: [p.entityId, ...named],
+      fingerprint: fp(['wd_wai', p.qid]),
+      validators: [
+        others.length === 0
+          ? ok('MODE_VALIDATOR', 'Five distinct clues; no other fetched player fits them all')
+          : fail(
+              'MODE_VALIDATOR',
+              'REJECTED',
+              `Clues also fit ${others
+                .slice(0, 3)
+                .map((x) => x.en)
+                .join(', ')}`,
+            ),
+        new Set(chosen.map((c) => c.text)).size === 5
+          ? ok('CLUES', 'Five different clues')
+          : fail('CLUES', 'REJECTED', 'Repeated clue'),
+      ],
+      components: {
+        rarity: rarity(p),
+        complexity: 50,
+        distractorSimilarity: 30,
+        temporalDistance: 30,
+        recallDepth: 50,
+      },
+      secretStrings: [p.en, ...(p.ar ? [p.ar] : [])],
+      preRevealText: chosen.map((c) => c.text),
     });
   }
   return out;

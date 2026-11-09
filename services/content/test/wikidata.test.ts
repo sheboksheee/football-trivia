@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import {
   matchesAlias,
   type ShortAnswerItem,
+  type WhoAmIItem,
   type ConnectionItem,
   type ImpostorItem,
   type McqItem,
@@ -250,5 +251,37 @@ describe('Wikidata data hygiene', () => {
     expect(item.answer).toBe('برونو كيست');
     expect(matchesAlias('Kest', [item.answer, ...item.aliases])).toBe(true);
     expect(by('Bruno Kest').preRevealText.join(' ')).not.toContain('Kest');
+  });
+});
+
+describe('Who Am I? (Wikidata)', () => {
+  it('five distinct clues, hardest first, varied per player, answer never leaked', async () => {
+    const { report } = await ingest();
+    const k = normalizeWikidata(report.snapshots);
+    const wai = generateWikidataCandidates(k).filter((c) => c.kind === 'who_am_i');
+    expect(wai.length).toBeGreaterThan(0);
+    for (const c of wai) {
+      const item = c.item as WhoAmIItem;
+      expect(item.clues).toHaveLength(5);
+      expect(new Set(item.clues).size).toBe(5);
+      expect(item.clues[4]).toMatch(/^اسمه/); // name hint is always the last (easiest) clue
+      for (const secret of c.secretStrings)
+        expect(item.clues.join(' ').toLowerCase()).not.toContain(secret.toLowerCase());
+      expect(matchesAlias(item.answer, [item.answer, ...item.aliases], item.rivals)).toBe(true);
+    }
+    // Variety: players do not all get the same clue shapes.
+    const shapes = new Set(
+      wai.map((c) => (c.item as WhoAmIItem).clues.map((x) => x.split(' ')[0]).join('|')),
+    );
+    expect(shapes.size).toBeGreaterThan(1);
+  });
+
+  it('rejected when another fetched player fits every clue', async () => {
+    const { report } = await ingest();
+    const k = normalizeWikidata(report.snapshots);
+    for (const c of generateWikidataCandidates(k).filter((x) => x.kind === 'who_am_i')) {
+      const v = c.validators.find((x) => x.gate === 'MODE_VALIDATOR')!;
+      if (!v.passed) expect(v.message).toMatch(/Clues also fit/);
+    }
   });
 });

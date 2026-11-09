@@ -453,6 +453,61 @@ export function GuessTheMatch({ v, me, role, players }: ModeProps) {
   );
 }
 
+// ---------------------------------------------------------------- Who Am I?
+export function WhoAmI({ v, me, role, players }: ModeProps) {
+  const { t, locale } = useI18n();
+  const it = v.item;
+  const mine = me ? v.submissions?.[me]?.answer : null;
+  const canAnswer = role === 'PLAYER' && v.phase === 'QUESTION' && !mine;
+  const worth = [5, 4, 3, 2, 1][Math.max(0, it.clues.length - 1)] ?? 1;
+  return (
+    <div className="stage">
+      <Head
+        label={modeName('who_am_i', locale)}
+        index={v.itemIndex}
+        count={v.itemCount}
+        end={v.phaseEnd}
+        start={v.phaseStart}
+      />
+      <h2 className="prompt">{t('wai_prompt')}</h2>
+      <ol className="list" aria-label={t('clues')}>
+        {[0, 1, 2, 3, 4].map((i) => (
+          <li key={i} className="list-item">
+            <span className="num accent" style={{ fontSize: 22 }}>
+              {i + 1}
+            </span>
+            <span className="grow" dir="auto">
+              {it.clues[i] ?? (
+                <span className="muted">{t('gm_clueLocked', { n: i + 1, s: it.clueTimes[i] / 1000 })}</span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ol>
+      {canAnswer && (
+        <>
+          <p className="small muted" style={{ margin: 0 }}>
+            {t('gm_worth', { pts: worth })}
+          </p>
+          <TextAnswer
+            disabled={!canAnswer}
+            onSubmit={(text) => client.act({ type: 'answer', text, itemIndex: v.itemIndex })}
+            placeholder={t('typeAnswer')}
+          />
+        </>
+      )}
+      <Locked show={!!mine && v.phase === 'QUESTION'}>
+        {t('lockedIn', { answer: mine?.text ?? '' })} · {t('gm_confirmed', { n: mine?.tier ?? 1 })}
+      </Locked>
+      {it.answer && <Banner tone="info">{t('wai_answer', { answer: it.answer })}</Banner>}
+      <RevealNote v={v} me={me} />
+      <AnsweredRow v={v} players={players} />
+      <Attribution text={it.attribution} />
+      <ScoreStrip scores={v.scores} players={players} />
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------- Connections
 export function Connections({ v, me, role, players }: ModeProps) {
   const { t, locale } = useI18n();
@@ -1099,6 +1154,8 @@ export function ModeView(props: ModeProps & { runKey: string }) {
       return <GuessTheMatch {...props} />;
     case 'connections':
       return <Connections {...props} />;
+    case 'who_am_i':
+      return <WhoAmI {...props} />;
     case 'risk_it':
       return <RiskIt {...props} />;
     case 'timeline':

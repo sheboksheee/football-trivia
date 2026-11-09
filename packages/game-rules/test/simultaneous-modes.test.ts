@@ -8,8 +8,9 @@ import {
   lastManStandingEngine,
   missingXiEngine,
   tiebreakEngine,
+  whoAmIEngine,
 } from '../src/index.js';
-import { conn, ctx, gm, hl, mcq, P, runTo, xi } from './fixtures.js';
+import { conn, ctx, gm, hl, mcq, P, runTo, wai, xi } from './fixtures.js';
 
 const pl = (m: string) => P('PLAYER', m);
 
@@ -259,5 +260,33 @@ describe('Championship tiebreak engine', () => {
     expect(tiebreakEngine.finished(s)).toBe(true);
     expect(s.answers.length).toBe(5);
     expect(tiebreakEngine.ranking(s)).toEqual([['a', 'b']]);
+  });
+});
+
+describe('Who Am I? (PROPOSED, owner-delegated)', () => {
+  const items = Array.from({ length: 6 }, (_, i) => wai(i));
+  it('clues every 8s; +5..+1 by clues visible at submission; wrong 0; one answer each', () => {
+    let s = whoAmIEngine.init(ctx(['a', 'b', 'c', 'd', 'e', 'f']), items, 0);
+    expect(whoAmIEngine.nextDeadline(s)).toBe(8000);
+    s = whoAmIEngine.act(s, pl('a'), { type: 'answer', text: 'player number0' }, 7999); // 1 clue -> 5
+    s = whoAmIEngine.act(s, pl('b'), { type: 'answer', text: 'Number0' }, 8000); // 2 -> 4
+    s = whoAmIEngine.act(s, pl('c'), { type: 'answer', text: 'Player Numbr0' }, 20000); // typo, 3 -> 3
+    s = whoAmIEngine.act(s, pl('d'), { type: 'answer', text: 'Someone Else' }, 100); // wrong -> 0
+    s = whoAmIEngine.act(s, pl('e'), { type: 'answer', text: 'Player Number0' }, 39000); // 5 -> 1
+    expect(() => whoAmIEngine.act(s, pl('a'), { type: 'answer', text: 'again' }, 9000)).toThrow();
+    s = runTo(whoAmIEngine, s, s.phaseEnd!);
+    expect(whoAmIEngine.scores(s)).toEqual({ a: '5', b: '4', c: '3', d: '0', e: '1', f: '0' });
+  });
+  it('a misspelling closer to a rival name is not accepted', () => {
+    let s = whoAmIEngine.init(ctx(['a', 'b']), items, 0);
+    s = whoAmIEngine.act(s, pl('a'), { type: 'answer', text: 'Player Nunber1' }, 100);
+    s = runTo(whoAmIEngine, s, s.phaseEnd!);
+    expect(whoAmIEngine.scores(s).a).toBe('0');
+  });
+  it('future clues and the answer never reach clients before the reveal', () => {
+    const s = whoAmIEngine.init(ctx(['a', 'b']), items, 0);
+    const v = JSON.stringify(whoAmIEngine.view(s, { memberId: null, role: 'SPECTATOR' }, 9000));
+    expect(v).toContain('k2');
+    expect(v).not.toMatch(/k3|k4|k5|Number0/);
   });
 });

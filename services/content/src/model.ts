@@ -147,6 +147,7 @@ export const KIND_TO_MODES: Record<ContentKind, ModeKey[]> = {
   impostor: ['impostor'],
   missing_xi: ['missing_xi'],
   guess_match: ['guess_the_match'],
+  who_am_i: ['who_am_i'],
   top25: ['top25'],
   auction: ['auction'],
 };

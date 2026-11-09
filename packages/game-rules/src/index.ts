@@ -11,6 +11,7 @@ export * from './modes/lastManStanding.js';
 export * from './modes/missingXi.js';
 export * from './modes/guessTheMatch.js';
 export * from './modes/connections.js';
+export * from './modes/whoAmI.js';
 export * from './modes/riskIt.js';
 export * from './modes/timeline.js';
 export * from './modes/top25.js';

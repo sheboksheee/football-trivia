@@ -3,6 +3,7 @@ import type {
   AuctionItem,
   ConnectionItem,
   GuessMatchItem,
+  WhoAmIItem,
   HigherLowerItem,
   ImpostorItem,
   ItemMeta,
@@ -96,6 +97,14 @@ export const gm = (i: number): GuessMatchItem => ({
   options: ['m1', 'm2', 'm3', 'm4'].map((id) => ({ id, label: id })),
   correctOptionId: 'm2',
   clues: ['c1', 'c2', 'c3'],
+});
+export const wai = (i: number): WhoAmIItem => ({
+  kind: 'who_am_i',
+  meta: meta(`wai${i}`),
+  clues: ['k1', 'k2', 'k3', 'k4', 'k5'],
+  answer: `Player Number${i}`,
+  aliases: [`Number${i}`],
+  rivals: [`Player Nunber${i + 1}`],
 });
 export const top25 = (): Top25Item => ({
   kind: 'top25',

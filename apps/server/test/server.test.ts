@@ -52,7 +52,8 @@ describe('server integration over WebSocket', () => {
     expect(h.ok).toBe(true);
     const modes = (await (await fetch(`http://127.0.0.1:${port}/api/modes`)).json()) as any;
     expect(modes.modes).toHaveLength(12);
-    expect(modes.playable).not.toContain('who_am_i');
+    expect(modes.playable).toContain('who_am_i');
+    expect(modes.playable).toHaveLength(12);
     expect(modes.availability.higher_lower.published).toBeGreaterThan(5);
     expect(await (await fetch(`http://127.0.0.1:${port}/metrics`)).text()).toContain(
       'ft_http_requests_total',

@@ -227,6 +227,8 @@ const en = {
   gm_clueLocked: 'Clue {n} unlocks at {s}s',
   gm_worth: 'One confirmed answer. Worth +{pts} right now (no speed bonus).',
   gm_confirmed: 'Confirmed with {n} clue(s)',
+  wai_prompt: 'Who am I?',
+  wai_answer: 'It was: {answer}',
   clues: 'Clues',
   // connections
   conn_prompt: 'What links these four?',
@@ -565,6 +567,8 @@ const ar: Dict = {
   gm_clueLocked: 'تلميح {n} هيظهر عند الثانية {s}',
   gm_worth: 'إجابة واحدة نهائية. بـ +{pts} دلوقتي (مفيش بونص سرعة).',
   gm_confirmed: 'جاوبت بعد {n} تلميح',
+  wai_prompt: 'أنا مين؟',
+  wai_answer: 'الإجابة: {answer}',
   clues: 'التلميحات',
   conn_prompt: 'إيه اللي يجمع الأربعة دول؟',
   conn_placeholder: 'الرابط',

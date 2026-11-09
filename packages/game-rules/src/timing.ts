@@ -12,6 +12,8 @@ export interface Timing {
   missingXiHints: [number, number];
   guessMatchQuestion: number;
   guessMatchClues: [number, number, number];
+  whoAmIQuestion: number;
+  whoAmIClues: [number, number, number, number, number];
   connectionsQuestion: number;
   riskChoose: number;
   riskAnswer: number;
@@ -44,6 +46,8 @@ export const DEFAULT_TIMING: Timing = {
   missingXiHints: [8_000, 14_000],
   guessMatchQuestion: 30_000,
   guessMatchClues: [0, 10_000, 20_000],
+  whoAmIQuestion: 40_000,
+  whoAmIClues: [0, 8_000, 16_000, 24_000, 32_000],
   connectionsQuestion: 20_000,
   riskChoose: 10_000,
   riskAnswer: 15_000,

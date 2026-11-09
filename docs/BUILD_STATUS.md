@@ -40,10 +40,10 @@ Without `TEST_DATABASE_URL` the 2 PostgreSQL tests are skipped (154 run).
 - Mobile widths/desktop, RTL, keyboard, reduced motion, 44px targets → `tests/e2e/game.spec.ts`
 
 ## Live content (Render demo, 2026-11-09)
-10 of 12 modes play on real, human-approved questions: Higher or Lower 164, Timeline 107, Guess the Match 159, Last Man Standing / Risk It 1,695, The Impostor 420, Connections 295, Buzzer 535, Auction 15, TOP 25 6. Missing XI has no line-up source yet (StatsBomb next); Who Am I? is blocked on rules.
+10 of 12 modes play on real, human-approved questions: Higher or Lower 164, Timeline 107, Guess the Match 159, Last Man Standing / Risk It 1,695, The Impostor 420, Connections 295, Buzzer 535, Auction 15, TOP 25 6. Missing XI has no line-up source yet (StatsBomb next). Who Am I? added 2026-11-09 (Wikidata clues, awaiting review on the server).
 
 ## Blockers (need you — not engineering choices)
-1. **Who Am I? rules** (timing, input type, wrong answers, ties).
+1. **Who Am I?** now runs on owner-delegated PROPOSED rules (P-W1…W4 in DECISIONS.md) — confirm or change.
 2. **Approve or change every PROPOSED item** in `docs/DECISIONS.md` (8 modes are "Provisional").
 3. **TOP 25 tie rule** and **Pass & Play** scope.
 4. **Licensed football data**: football-data.org is integrated (results, tables, venues → Higher or Lower, Who came first, Guess the Match, MCQ, Buzzer). Verified live on 2026-11-08 (60/60 requests ok, ~940 real questions generated). Needs: the token on the deployed server (`FOOTBALL_DATA_API_KEY`), a license decision in the Content Studio, your approval of the generated questions, and written confirmation of commercial use before a public launch. Player-level modes: The Impostor and Connections now come from **Wikidata (CC0)**; Missing XI, TOP 25 and Auction still need line-up/scorer data (paid plan or StatsBomb Open Data for private testing). **OpenFootball (CC0)** cross-checks football-data.org scores; disagreements are quarantined.

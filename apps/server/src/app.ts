@@ -64,6 +64,8 @@ export async function createApp(
     log?: Logger;
     footballDataFetch?: FetchLike;
     openDataFetch?: FetchLike;
+    /** Build the question bank after the port opens (production). Tests await it instead. */
+    deferContentInit?: boolean;
   } = {},
 ): Promise<App> {
   const log = opts.log ?? createLogger(config.LOG_LEVEL);
@@ -420,6 +422,7 @@ function summarize(item: ContentItem): string {
       i.category ??
       i.match ??
       i.footballer ??
+      i.answer ??
       (Array.isArray(i.entities) ? (i.entities as string[]).join(' · ') : '') ??
       item.kind,
   ).slice(0, 140);

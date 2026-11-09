@@ -477,6 +477,64 @@ export function generateCandidates(kb: KnowledgeBase, seed = 7): Candidate[] {
     });
   }
 
+  // ---------------- Who Am I?: five clues, hardest first (fictional fixture players)
+  const POS: Record<string, string> = { FW: 'Forward', MF: 'Midfielder', DF: 'Defender', GK: 'Goalkeeper' };
+  for (const p of kb.players.filter((x) => (careerGoals.get(x.id) ?? 0) >= 25)) {
+    const clubs = [...clubsOf(p.id)].sort();
+    if (!clubs.length) continue;
+    const [c1, c2] = shuffle(clubs, rng);
+    const clues: [string, string, string, string, string] = [
+      `Started for ${clubs.length} club(s) in the ${FIXTURE_COMPETITION}`,
+      `Plays as a ${POS[p.position] ?? p.position}`,
+      `Represents ${p.nationality}`,
+      c2
+        ? `Started league matches for ${clubName(c1!)} and ${clubName(c2)}`
+        : `Started league matches for ${clubName(c1!)}`,
+      `Name starts with “${p.name[0]}”`,
+    ];
+    const others = kb.players.filter(
+      (q) =>
+        q.id !== p.id &&
+        q.nationality === p.nationality &&
+        q.position === p.position &&
+        q.name[0] === p.name[0] &&
+        clubsOf(q.id).has(c1!) &&
+        (!c2 || clubsOf(q.id).has(c2)) &&
+        clubsOf(q.id).size === clubs.length,
+    );
+    out.push({
+      kind: 'who_am_i',
+      template: 'wai.player',
+      item: {
+        kind: 'who_am_i',
+        clues,
+        answer: p.name,
+        aliases: aliasesOf(p.id),
+        rivals: kb.players
+          .filter((q) => q.id !== p.id && q.nationality === p.nationality)
+          .slice(0, 30)
+          .map((q) => q.name),
+      },
+      factIds: [...p.factIds, ...startFacts(p.id)],
+      entityIds: [p.id, ...clubs],
+      fingerprint: fp(['wai', p.id]),
+      validators: [
+        others.length === 0
+          ? ok('MODE_VALIDATOR', 'No other player fits all five clues')
+          : fail('MODE_VALIDATOR', 'REJECTED', 'Clues fit more than one player'),
+      ],
+      components: {
+        rarity: 50,
+        complexity: 40,
+        distractorSimilarity: 20,
+        temporalDistance: 30,
+        recallDepth: 50,
+      },
+      secretStrings: [p.name],
+      preRevealText: clues,
+    });
+  }
+
   // ---------------- Missing XI: verified kickoff XI with one starter hidden
   for (const m of shuffle(kb.matches, rng).slice(0, 120)) {
     const clubId = rng() < 0.5 ? m.homeId : m.awayId;

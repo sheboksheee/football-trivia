@@ -105,6 +105,17 @@ export interface AuctionItem {
   universe: { label: string; aliases: string[] }[];
 }
 
+/** Who Am I?: one footballer, five clues from hardest to easiest. */
+export interface WhoAmIItem {
+  kind: 'who_am_i';
+  meta: ItemMeta;
+  clues: [string, string, string, string, string];
+  answer: string;
+  aliases: string[];
+  /** Other names a misspelling must not be closer to (typo tolerance). */
+  rivals: string[];
+}
+
 export type ContentItem =
   | McqItem
   | HigherLowerItem
@@ -115,6 +126,7 @@ export type ContentItem =
   | MissingXiItem
   | GuessMatchItem
   | Top25Item
-  | AuctionItem;
+  | AuctionItem
+  | WhoAmIItem;
 
 export type ContentKind = ContentItem['kind'];

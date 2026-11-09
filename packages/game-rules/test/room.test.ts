@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { ContentItem, ModeKey } from '@ft/shared';
+import { MODES, type ContentItem, type ModeKey } from '@ft/shared';
 import {
   advance,
   createRoom,
@@ -108,7 +108,14 @@ describe('room lifecycle', () => {
     ).toMatch(/at least 2/);
     expect(r.view('h').startIssues.map((i) => i.code)).toContain('TOO_FEW_PLAYERS');
     r.join('b');
-    expect(r.try(() => r.configure(['who_am_i']))).toMatch(/not playable/);
+    // No mode is BLOCKED any more (Who Am I? rules were delegated); the guard still works.
+    MODES.top25.rulesStatus = 'BLOCKED';
+    try {
+      expect(r.try(() => r.configure(['top25']))).toMatch(/not playable/);
+    } finally {
+      MODES.top25.rulesStatus = 'PROVISIONAL';
+    }
+    expect(r.try(() => r.configure(['who_am_i']))).toBe('ok');
     expect(
       r.try(() =>
         r.cmd('h', { type: 'room.configure', payload: { preset: 'MARATHON', modes: ['higher_lower'] } }),

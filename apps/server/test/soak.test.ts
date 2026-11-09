@@ -32,7 +32,7 @@ function randomActions(rng: () => number): Array<Record<string, unknown>> {
   ];
 }
 
-describe('soak: full 11-mode Match Night with bots', () => {
+describe('soak: full 12-mode Match Night with bots', () => {
   for (const seed of [1, 2, 3]) {
     it(`completes, replays identically and never leaks secrets to spectators (seed ${seed})`, () => {
       const rng = createRng(seed);

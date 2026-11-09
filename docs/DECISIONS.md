@@ -18,7 +18,6 @@ Legend: **APPROVED** = user-confirmed (authoritative). **PROPOSED** = chosen by 
 ## BLOCKED — needs a product decision before code
 | Item | Why | Effect today |
 |---|---|---|
-| **Who Am I?** rules | Clue timing, input type, wrong-answer handling and ties are unspecified; GDD §4 says not to infer them. | Shown as "Awaiting rules", cannot be added to a playlist. Full Marathon (12) is therefore unavailable. |
 | TOP 25 tie rule (Sudden Draft vs Final Equalizer) | Conflicting rules in GDD §4 / Blueprint K. | No mode tie-break; equal totals share the place (see P-T2). |
 | Pass & Play support matrix | Blueprint K. | Not implemented. Private Online rooms only (local multi-device works through the same online room). |
 | In-game kick voting policy | "eligible-majority approval" undefined. | Host can remove spectators in-game and anyone in the lobby; in-game participant kicks are refused with an explanation. |
@@ -48,6 +47,10 @@ Legend: **APPROVED** = user-confirmed (authoritative). **PROPOSED** = chosen by 
 | P-R1 | Risk It | Turns are sequential in seat order (6 rounds × N players). |
 | P-R2 | Risk It | No risk chosen in 10s → SAFE; no answer in 15s → wrong (penalty applies). |
 | P-R3 | Risk It | Question is the same whatever risk is chosen (no per-tier pools yet; Blueprint C3 calibration pending). |
+| P-W1 | Who Am I? | **Owner delegated the rules (2026-11-09: "ظبط انت القواعد", "خلي الكلوهات متنوعه").** 6 footballers per game, 40s each; 5 clues hardest → easiest at 0/8/16/24/32s. |
+| P-W2 | Who Am I? | One typed answer per player (Arabic/English, typo policy as approved), locked at submission; no buzzer. |
+| P-W3 | Who Am I? | Correct with k clues visible = 6 − k points (+5 … +1); wrong or none 0, no penalty, no retry; no speed bonus; equal totals share the place. |
+| P-W4 | Who Am I? | Clues vary per player (seeded): hard = famous teammate with overlapping spell, or league(s) of his clubs; medium = national team, or club + decade; easy = club + year joined, another club; last = name initial / surname length. A question is rejected if any other fetched player fits every clue. |
 | P-T2 | TOP 25 | Game also ends when all 25 are found or after 25 snake rounds (safety cap). No Sudden Draft. |
 
 ### Cross-mode rules

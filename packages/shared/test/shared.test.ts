@@ -56,9 +56,9 @@ describe('mode catalog', () => {
     expect(MODE_KEYS).toHaveLength(12);
     expect(MODE_KEYS.map((k) => MODES[k].number)).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12]);
   });
-  it('Who Am I? is blocked pending rules; every PROVISIONAL mode lists its proposals', () => {
-    expect(MODES.who_am_i.rulesStatus).toBe('BLOCKED');
-    expect(PLAYABLE_MODE_KEYS).not.toContain('who_am_i');
+  it('Who Am I? runs on owner-delegated PROVISIONAL rules; every PROVISIONAL mode lists its proposals', () => {
+    expect(MODES.who_am_i.rulesStatus).toBe('PROVISIONAL');
+    expect(PLAYABLE_MODE_KEYS).toContain('who_am_i');
     for (const k of MODE_KEYS) {
       const m = MODES[k];
       if (m.rulesStatus === 'PROVISIONAL') expect(m.proposed.length).toBeGreaterThan(0);

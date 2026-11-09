@@ -24,6 +24,7 @@ const KINDS = [
   'guess_match',
   'top25',
   'auction',
+  'who_am_i',
 ];
 const tone = (s: string) =>
   s === 'PUBLISHED'
