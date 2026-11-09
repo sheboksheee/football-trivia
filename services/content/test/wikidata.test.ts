@@ -6,6 +6,7 @@ import {
   normalizeWikidata,
   generateWikidataCandidates,
   resolveClubs,
+  plausibleArabic,
   runPipeline,
   setSourceLicense,
   sourceById,
@@ -185,5 +186,46 @@ describe('Wikidata questions', () => {
     expect(wd2.filter((q) => q.status === 'NEEDS_REVIEW').length).toBeGreaterThan(0);
     // Same snapshots -> same ids (human reviews survive re-ingestion)
     expect(wd2.map((q) => q.id).sort()).toEqual(wd.map((q) => q.id).sort());
+  });
+});
+
+describe('Wikidata data hygiene', () => {
+  it('ignores vandalised or non-Arabic labels and falls back to the English name', () => {
+    expect(plausibleArabic('Aron Vale', 'آرون فيل')).toBe('آرون فيل');
+    expect(plausibleArabic('Aron Vale', 'آرون فيل كلمة زيادة')).toBeNull();
+    expect(plausibleArabic('Aron Vale', 'Aron Vale')).toBeNull();
+    expect(plausibleArabic('Aron Vale', undefined)).toBeNull();
+  });
+
+  it('a club whose player list is not loaded yet is never used as an MCQ distractor', async () => {
+    const { report } = await ingest();
+    const partial = report.snapshots.filter(
+      (s) => !(s.recordType === 'wd_club_players' && s.externalId === CLUB_QID['Elm City']),
+    );
+    const k = normalizeWikidata(partial);
+    expect(k.clubs.has(CLUB_QID['Elm City']!)).toBe(true);
+    const elm = `wd_club_${CLUB_QID['Elm City']}`;
+    expect(k.loadedClubs.has(elm)).toBe(false);
+    const mcq = generateWikidataCandidates(k).filter((x) => x.template === 'wd.mcq.played_for');
+    expect(mcq.length).toBeGreaterThan(0);
+    expect(mcq.every((q) => !q.entityIds.includes(elm))).toBe(true);
+  });
+
+  it('fetching more clubs later keeps the ids of questions whose own facts did not change', async () => {
+    const { report } = await ingest();
+    const partial = report.snapshots.filter(
+      (s) => !(s.recordType === 'wd_club_players' && s.externalId === CLUB_QID['Elm City']),
+    );
+    const fps = (snaps: typeof partial) =>
+      new Set(generateWikidataCandidates(normalizeWikidata(snaps)).map((c) => c.fingerprint));
+    const before = fps(partial);
+    const after = fps(report.snapshots);
+    // Dario Moss only ever played for Alder FC: his questions are identical either way.
+    const moss = generateWikidataCandidates(normalizeWikidata(partial)).filter((c) =>
+      c.entityIds.includes('wd_player_Q920003'),
+    );
+    expect(moss.length).toBeGreaterThan(0);
+    expect(moss.every((c) => after.has(c.fingerprint))).toBe(true);
+    expect(before.size).toBeGreaterThan(0);
   });
 });

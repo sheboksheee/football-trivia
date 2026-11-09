@@ -368,8 +368,23 @@ export interface WdKB {
   factIndex: Map<string, Fact>;
   snapshots: Map<string, RawSnapshot>;
   clubs: Map<string, WdClub & { entityId: string }>;
+  /** Club entity ids whose player list is loaded. Only these can be distractors or alternate links. */
+  loadedClubs: Set<string>;
   players: Map<string, WdPlayer>;
   invalid: Array<{ snapshotId: string; error: string }>;
+}
+
+/**
+ * Community labels can be vandalised (live example: an Arabic player label with two extra words).
+ * An Arabic label is used only when it is Arabic script and has about as many words as the
+ * English label; otherwise the English name is shown.
+ */
+export function plausibleArabic(en: string, ar: string | undefined): string | null {
+  if (!ar) return null;
+  const words = (x: string) => x.split(/[\s-]+/).filter(Boolean).length;
+  if (!/^[\u0600-\u06FF\s\-'.]+$/.test(ar)) return null;
+  if (words(ar) > words(en) + 1) return null;
+  return ar;
 }
 
 const year = (v: string | undefined) => (v && /^\d{4}-/.test(v) ? v.slice(0, 10) : null);
@@ -381,6 +396,7 @@ export function normalizeWikidata(snaps: RawSnapshot[]): WdKB {
     factIndex: new Map(),
     snapshots: new Map(),
     clubs: new Map(),
+    loadedClubs: new Set(),
     players: new Map(),
     invalid: [],
   };
@@ -416,6 +432,7 @@ export function normalizeWikidata(snaps: RawSnapshot[]): WdKB {
     }
     const club = kb.clubs.get(p.data.club);
     if (!club) continue; // club no longer resolves: its players are not used
+    kb.loadedClubs.add(club.entityId);
     const seen = new Set<string>();
     for (const r of p.data.rows) {
       if (!r.p || !QID.test(r.p) || !r.en) continue;
@@ -425,6 +442,8 @@ export function normalizeWikidata(snaps: RawSnapshot[]): WdKB {
       const pid = `wd_player_${r.p}`;
       let pl = kb.players.get(pid);
       if (!pl) {
+        r.ar = plausibleArabic(r.en, r.ar) ?? '';
+        if (!r.ar) delete r.ar;
         pl = {
           entityId: pid,
           qid: r.p,
@@ -507,7 +526,13 @@ export interface WdGenOptions {
 }
 
 export function generateWikidataCandidates(kb: WdKB, o: WdGenOptions = {}): Candidate[] {
-  const rng = createRng(o.seed ?? 23);
+  // Randomness is seeded per club / per player, so a question only changes when its own data does
+  // (stable ids keep human reviews when more clubs are fetched later).
+  const seedOf = (key: string) =>
+    createRng(
+      ((o.seed ?? 23) ^ Number.parseInt(createHash('sha256').update(key).digest('hex').slice(0, 8), 16)) >>>
+        0,
+    );
   const impMin = o.impostorMinSitelinks ?? 60;
   const memMin = o.memberMinSitelinks ?? 45;
   const out: Candidate[] = [];
@@ -563,6 +588,7 @@ export function generateWikidataCandidates(kb: WdKB, o: WdGenOptions = {}): Cand
     for (const c of clubsOf(p)) members.set(c, [...(members.get(c) ?? []), p]);
   for (const [club, list] of [...members.entries()].sort(([a], [b]) => a.localeCompare(b))) {
     const used = new Set<string>();
+    const rng = seedOf(club);
     for (let k = 0; k < (o.connectionsPerClub ?? 3); k++) {
       const four = shuffle(
         list.filter((p) => !used.has(p.qid)),
@@ -613,12 +639,13 @@ export function generateWikidataCandidates(kb: WdKB, o: WdGenOptions = {}): Cand
 
   // ---- MCQ: which of these clubs did the player play for? Distractors have no P54 statement for
   // the player in the fetched club lists (Wikidata can be incomplete: a reviewer confirms).
-  const clubIds = [...kb.clubs.values()].map((c) => c.entityId).sort();
+  const clubIds = [...kb.loadedClubs].sort();
   const league = (id: string) =>
     [...kb.clubs.values()].find((c) => c.entityId === id)?.competitionCode ?? null;
   for (const p of players.filter((x) => x.sitelinks >= memMin)) {
-    const mine = clubsOf(p);
+    const mine = clubsOf(p).sort();
     if (!mine.length) continue;
+    const rng = seedOf(p.qid);
     const answer = mine[Math.floor(rng() * mine.length)]!;
     const same = clubIds.filter((c) => !mine.includes(c) && league(c) === league(answer));
     const pool = same.length >= 3 ? same : clubIds.filter((c) => !mine.includes(c));

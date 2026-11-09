@@ -419,14 +419,10 @@ export class ContentService {
         ...(od.fetch ? { fetch: od.fetch } : {}),
         ...(od.minIntervalMs !== undefined ? { minIntervalMs: od.minIntervalMs } : {}),
       });
-      let since = 0;
+      // One rebuild at the end: open-data runs are a few minutes and rebuilds are the costly part.
       const absorbWd = async (snap: RawSnapshot) => {
         await this.db.saveSnapshots([snap]);
         this.wdSnapshots = [...this.wdSnapshots.filter((x) => x.id !== snap.id), snap];
-        if (snap.recordType === 'wd_club_players' && ++since >= 10) {
-          since = 0;
-          await this.rebuild();
-        }
       };
       const wd = await ingestWikidata(client, {
         teams,
