@@ -18,12 +18,14 @@ Verified on the official site and docs (not assumed):
 - Players: `P54` membership statements of that club (start/end qualifiers), occupation association football player (Q937857), ≥30 sitelinks, English + Arabic labels, `P1532` country for sport.
 - Questions (all need human review): The Impostor (≥60 sitelinks), Connections (4 players of one club; rejected if they share another fetched club or a national team), MCQ "which of these clubs did he play for?" (distractors have no membership statement — Wikidata can be incomplete, the reviewer confirms).
 - Live check (4 clubs): 802 players, 931 membership facts, 179 Impostor / 12 Connections / 379 MCQ candidates, Arabic names present for famous players.
+- **Live run on Render (2026-11-09):** 262 responses, 0 refused; 2,162 candidates (420 Impostor, 302 Connections, 1,440 MCQ). Owner-instructed review: a 24-question sample checked against known careers, then 1,100 approved; ~555 still awaiting review. Found and fixed during review: a vandalised Arabic label (now ignored → English name) and distractors from clubs not loaded yet.
 - Implementation: `services/content/src/providers/wikidata.ts`.
 
 ## Integrated: OpenFootball football.json (2026-11-09) — cross-check only
 - **License verified:** CC0 1.0 / public domain (LICENSE.md in the repository).
 - Files: `https://raw.githubusercontent.com/openfootball/football.json/master/<YYYY-YY>/<en.1|es.1|it.1|de.1|fr.1>.json`, available 2019-20 → 2026-27.
 - Use: every league match is paired with football-data.org by (league, season, home club, away club); names are matched typo-tolerantly against the club aliases, an unresolved name is reported and skipped. Equal full-time score = corroboration; different = the football-data fact becomes `CONFLICTED` → all dependent questions are `QUARANTINED`. Nothing is overwritten. No questions are generated from it directly.
+- **Live run (2026-11-09):** 11 completed league seasons, 3,532 matches compared, 3,532 agree, 0 conflicts, 0 unmatched names. Current-season files (2025-26, 2026-27) fail validation (unplayed matches in a different shape) and are skipped; they are not used for questions anyway.
 - Implementation: `services/content/src/providers/openFootball.ts`.
 
 ## Next free source (planned): StatsBomb Open Data
