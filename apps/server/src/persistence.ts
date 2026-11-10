@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -12,6 +13,45 @@ export interface StoredRoom {
 }
 
 /** Durable system of record. All writes are append-only except room status and session token rotation. */
+/** What a rebuild needs from a stored question: human decisions, not the content itself. */
+export type QuestionState = Pick<
+  Question,
+  'id' | 'fingerprint' | 'status' | 'version' | 'audit' | 'difficulty'
+> & {
+  /** Hash of the wording (item without meta), to detect a rewording. */
+  wording: string;
+};
+
+/** JSON with object keys sorted at every level (PostgreSQL jsonb does not keep key order). */
+export function canonicalJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`;
+  if (v && typeof v === 'object')
+    return `{${Object.entries(v as Record<string, unknown>)
+      .filter(([, x]) => x !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([k, x]) => `${JSON.stringify(k)}:${canonicalJson(x)}`)
+      .join(',')}}`;
+  return JSON.stringify(v ?? null);
+}
+
+export function wordingHash(item: Question['item']): string {
+  return createHash('sha1')
+    .update(canonicalJson({ ...item, meta: undefined }))
+    .digest('hex');
+}
+
+export function questionState(q: Question): QuestionState {
+  return {
+    id: q.id,
+    fingerprint: q.fingerprint,
+    status: q.status,
+    version: q.version,
+    audit: q.audit,
+    difficulty: q.difficulty,
+    wording: wordingHash(q.item),
+  };
+}
+
 export interface Persistence {
   readonly kind: 'memory' | 'postgres';
   init(): Promise<void>;
@@ -41,6 +81,8 @@ export interface Persistence {
   loadSnapshots(sourceId: string): Promise<RawSnapshot[]>;
   loadSources(): Promise<SourceRecord[]>;
   loadQuestions(): Promise<Map<string, Question>>;
+  /** Review state of every stored question, without its content (read in pages: low memory). */
+  loadQuestionStates(): Promise<Map<string, QuestionState>>;
   saveQuestions(q: Question[]): Promise<void>;
   close(): Promise<void>;
 }
@@ -126,6 +168,9 @@ export class MemoryPersistence implements Persistence {
   }
   async loadQuestions() {
     return new Map(this.questions);
+  }
+  async loadQuestionStates() {
+    return new Map([...this.questions.values()].map((q) => [q.id, questionState(q)]));
   }
   async saveQuestions(q: Question[]) {
     for (const x of q) this.questions.set(x.id, x);
@@ -331,6 +376,19 @@ export class PostgresPersistence implements Persistence {
   async loadQuestions() {
     const r = await this.pool.query<{ payload: Question }>('SELECT payload FROM questions');
     return new Map(r.rows.map((x) => [x.payload.id, x.payload]));
+  }
+  async loadQuestionStates() {
+    const out = new Map<string, QuestionState>();
+    let after = '';
+    for (;;) {
+      const r = await this.pool.query<{ id: string; payload: Question }>(
+        'SELECT id, payload FROM questions WHERE id > $1 ORDER BY id LIMIT 500',
+        [after],
+      );
+      for (const row of r.rows) out.set(row.id, questionState(row.payload));
+      if (r.rows.length < 500) return out;
+      after = r.rows.at(-1)!.id;
+    }
   }
   async saveQuestions(qs: Question[]) {
     const client = await this.pool.connect();

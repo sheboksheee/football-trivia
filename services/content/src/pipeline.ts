@@ -57,6 +57,8 @@ export interface PipelineInputs {
   openFootball?: RawSnapshot[];
   /** Line-ups typed in by the owner in the Content Studio, each with a cited source. */
   manualLineups?: RawSnapshot[];
+  /** Generate the fictional development league (default true). */
+  includeFixture?: boolean;
   /** ISO date used to decide which seasons are complete. */
   today?: string;
 }
@@ -71,8 +73,9 @@ export function runPipeline(
   at = '2026-11-01T00:00:00.000Z',
   inputs: PipelineInputs = {},
 ): PipelineResult {
-  const league = generateLeague();
-  const snaps = fixtureSnapshots(league, at);
+  // The fictional league is large; hosts that only serve real content can skip it.
+  const withFixture = inputs.includeFixture !== false;
+  const snaps = withFixture ? fixtureSnapshots(generateLeague(), at) : [];
   const kb = normalize(snaps);
   const conflicts = verify(kb);
   const today = inputs.today ?? new Date().toISOString().slice(0, 10);
@@ -83,7 +86,15 @@ export function runPipeline(
   const wdKb = inputs.wikidata?.length ? normalizeWikidata(inputs.wikidata) : null;
   let manualKb: ManualKB | null = null;
   const groups: CandidateGroup[] = [
-    { kb, candidates: generateCandidates(kb), idPrefix: (i, f, kind) => `q_${kind}_${f.slice(0, 12)}_${i}` },
+    ...(withFixture
+      ? [
+          {
+            kb,
+            candidates: generateCandidates(kb),
+            idPrefix: (i: number, f: string, kind: string) => `q_${kind}_${f.slice(0, 12)}_${i}`,
+          },
+        ]
+      : []),
   ];
   // Provider question ids depend only on the fact fingerprint, so human reviews survive re-ingestion.
   if (fdKb)

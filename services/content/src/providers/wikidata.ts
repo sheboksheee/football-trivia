@@ -538,7 +538,19 @@ export function generateWikidataCandidates(kb: WdKB, o: WdGenOptions = {}): Cand
   const out: Candidate[] = [];
   const clubName = (id: string) => kb.entities.get(id)?.names.ar ?? kb.entities.get(id)?.name ?? id;
   const playerName = (p: WdPlayer) => p.ar ?? p.en;
-  const clubsOf = (p: WdPlayer) => [...new Set(p.spells.map((s) => s.club))];
+  // Cached: these are called inside nested loops over thousands of players (slow small hosts).
+  const clubCache = new Map<WdPlayer, string[]>();
+  const clubsOf = (p: WdPlayer) => {
+    let c = clubCache.get(p);
+    if (!c) clubCache.set(p, (c = [...new Set(p.spells.map((s) => s.club))]));
+    return c;
+  };
+  const clubSetCache = new Map<WdPlayer, Set<string>>();
+  const clubSet = (p: WdPlayer) => {
+    let c = clubSetCache.get(p);
+    if (!c) clubSetCache.set(p, (c = new Set(clubsOf(p))));
+    return c;
+  };
   const firstYear = (p: WdPlayer, club: string) =>
     p.spells
       .filter((s) => s.club === club && s.from)
@@ -640,8 +652,8 @@ export function generateWikidataCandidates(kb: WdKB, o: WdGenOptions = {}): Cand
   // ---- MCQ: which of these clubs did the player play for? Distractors have no P54 statement for
   // the player in the fetched club lists (Wikidata can be incomplete: a reviewer confirms).
   const clubIds = [...kb.loadedClubs].sort();
-  const league = (id: string) =>
-    [...kb.clubs.values()].find((c) => c.entityId === id)?.competitionCode ?? null;
+  const leagueIds = new Map([...kb.clubs.values()].map((c) => [c.entityId, c.competitionCode]));
+  const league = (id: string) => leagueIds.get(id) ?? null;
   for (const p of players.filter((x) => x.sitelinks >= memMin)) {
     const mine = clubsOf(p).sort();
     if (!mine.length) continue;
@@ -691,7 +703,7 @@ export function generateWikidataCandidates(kb: WdKB, o: WdGenOptions = {}): Cand
     if (mine.length < 3) continue;
     const rng = seedOf(`sa:${p.qid}`);
     const three = shuffle(mine, rng).slice(0, 3).sort();
-    const others = allPlayers.filter((x) => x !== p && three.every((c) => clubsOf(x).includes(c)));
+    const others = allPlayers.filter((x) => x !== p && three.every((c) => clubSet(x).has(c)));
     const e = kb.entities.get(p.entityId)!;
     const names = three.map(clubName);
     out.push({
@@ -735,14 +747,23 @@ export function generateWikidataCandidates(kb: WdKB, o: WdGenOptions = {}): Cand
   const today = new Date().toISOString().slice(0, 10);
   const overlap = (a: WdSpell, b: WdSpell) =>
     !!a.from && !!b.from && a.from <= (b.to ?? today) && b.from <= (a.to ?? today);
-  const tokens = (x: string) =>
-    new Set(
-      normalizeAnswer(x)
-        .split(' ')
-        .filter((t) => t.length > 2),
-    );
-  const leagueOf = (club: string) =>
-    [...kb.clubs.values()].find((c) => c.entityId === club)?.competitionCode ?? null;
+  const tokenCache = new Map<string, Set<string>>();
+  const tokens = (x: string) => {
+    let t = tokenCache.get(x);
+    if (!t)
+      tokenCache.set(
+        x,
+        (t = new Set(
+          normalizeAnswer(x)
+            .split(' ')
+            .filter((w) => w.length > 2),
+        )),
+      );
+    return t;
+  };
+  const famous = players.filter((x) => x.sitelinks >= impMin);
+  const leagueByClub = new Map([...kb.clubs.values()].map((c) => [c.entityId, c.competitionCode]));
+  const leagueOf = (club: string) => leagueByClub.get(club) ?? null;
   for (const p of players.filter((x) => x.sitelinks >= impMin)) {
     const rng = seedOf(`wai:${p.qid}`);
     const pick = <T>(xs: T[]) => xs[Math.floor(rng() * xs.length)];
@@ -754,8 +775,8 @@ export function generateWikidataCandidates(kb: WdKB, o: WdGenOptions = {}): Cand
     // A famous teammate: overlapping spell at the same club, no shared name token (no leaks).
     const mates: Array<{ mate: WdPlayer; club: string; facts: string[] }> = [];
     for (const sp of p.spells)
-      for (const q of players)
-        if (q !== p && q.sitelinks >= impMin && ![...tokens(q.en)].some((t) => own.has(t)))
+      for (const q of famous)
+        if (q !== p && ![...tokens(q.en)].some((t) => own.has(t)))
           for (const sq of q.spells)
             if (sq.club === sp.club && overlap(sp, sq))
               mates.push({ mate: q, club: sp.club, facts: [sp.factId, sq.factId] });
@@ -839,14 +860,14 @@ export function generateWikidataCandidates(kb: WdKB, o: WdGenOptions = {}): Cand
     const others = allPlayers.filter((q) => {
       if (q === p) return false;
       if (natUsed && q.nationality !== p.nationality) return false;
-      if (!named.every((c) => clubsOf(q).includes(c))) return false;
+      if (!named.every((c) => clubSet(q).has(c))) return false;
       if (initial && [...playerName(q)][0] !== [...name][0]) return false;
       return true;
     });
     const e = kb.entities.get(p.entityId)!;
     const rivals = allPlayers
       .filter((q) => q !== p && q.nationality === p.nationality)
-      .slice(0, 30)
+      .slice(0, 12)
       .flatMap((q) => [q.en, ...(q.ar ? [q.ar] : [])]);
     out.push({
       kind: 'who_am_i',

@@ -17,6 +17,9 @@ services:
         value: '22'
       - key: DEMO_MODE
         value: 'true'
+      # Real questions only: skipping the fictional league halves boot time on the free instance.
+      - key: FIXTURE_CONTENT
+        value: 'false'
       - key: WEB_DIST
         value: apps/web/dist
       - key: SESSION_SECRET

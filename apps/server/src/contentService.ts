@@ -39,7 +39,7 @@ import {
   type SourceRecord,
 } from '@ft/content';
 import { engineFor } from '@ft/game-rules';
-import type { Persistence } from './persistence.js';
+import { wordingHash, type Persistence } from './persistence.js';
 import type { Logger } from './logger.js';
 
 /** Statuses produced by failed gates. A human decision can never override these on reload. */
@@ -86,6 +86,8 @@ export interface ContentOptions {
   requireCommercialRights: boolean;
   footballData?: FootballDataSettings;
   openData?: OpenDataSettings;
+  /** Build the fictional development league (off on small hosts that serve real content). */
+  fixtureContent?: boolean;
 }
 
 export interface IngestStatus {
@@ -142,7 +144,8 @@ export class ContentService {
     await this.rebuild();
     this.ready = true;
     await this.db.saveSources(SOURCES);
-    if (this.db.kind === 'postgres') await this.db.saveSnapshots(fixtureSnapshots(generateLeague()));
+    if (this.db.kind === 'postgres' && this.o.fixtureContent !== false)
+      await this.db.saveSnapshots(fixtureSnapshots(generateLeague()));
   }
 
   /**
@@ -156,9 +159,10 @@ export class ContentService {
       wikidata: this.wdSnapshots,
       openFootball: this.ofSnapshots,
       manualLineups: this.mlSnapshots,
+      includeFixture: this.o.fixtureContent !== false,
     });
     const bank = this.result.bank;
-    const stored = await this.db.loadQuestions();
+    const stored = await this.db.loadQuestionStates();
     let restored = 0;
     for (const q of bank.all()) {
       const prev = stored.get(q.id);
@@ -171,8 +175,7 @@ export class ContentService {
       }
       // Same verified facts (same fingerprint) but new wording, e.g. Arabic templates: keep the human
       // decision, bump the version and record the rewording in the audit trail.
-      const wording = (x: Question) => JSON.stringify({ ...x.item, meta: undefined });
-      if (wording(prev) !== wording(q)) {
+      if (prev.wording !== wordingHash(q.item)) {
         const version = prev.version + 1;
         bank.upsert({
           ...q,

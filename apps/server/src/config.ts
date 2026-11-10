@@ -40,6 +40,11 @@ const Env = z.object({
     .enum(['true', 'false'])
     .default('true')
     .transform((v) => v === 'true'),
+  /** Build the fictional development question bank (turn off on small hosts serving real data). */
+  FIXTURE_CONTENT: z
+    .enum(['true', 'false'])
+    .default('true')
+    .transform((v) => v === 'true'),
   OPEN_DATA_AUTO_INGEST: z
     .enum(['true', 'false'])
     .default('true')

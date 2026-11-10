@@ -89,6 +89,7 @@ export async function createApp(
       ...fd,
       ...(opts.footballDataFetch ? { fetch: opts.footballDataFetch, minIntervalMs: 0 } : {}),
     },
+    fixtureContent: config.FIXTURE_CONTENT,
     openData: {
       enabled: config.OPEN_DATA_ENABLED,
       ...(opts.openDataFetch ? { fetch: opts.openDataFetch, minIntervalMs: 0 } : {}),

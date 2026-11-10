@@ -3,13 +3,28 @@ import pg from 'pg';
 import pino from 'pino';
 import { loadConfig } from '../src/config.js';
 import { createApp } from '../src/app.js';
-import { migrate } from '../src/persistence.js';
+import { migrate, PostgresPersistence, wordingHash } from '../src/persistence.js';
+import { runPipeline } from '@ft/content';
 import { TestClient } from './client.js';
 
 const url = process.env.TEST_DATABASE_URL;
 const d = url ? describe : describe.skip;
 
 d('PostgreSQL persistence (requires TEST_DATABASE_URL)', () => {
+  it('question review states load in pages without the content (low memory boot)', async () => {
+    const db = new PostgresPersistence(url!);
+    await db.init();
+    const qs = runPipeline().bank.all().slice(0, 1203);
+    await db.saveQuestions(qs);
+    const states = await db.loadQuestionStates();
+    for (const q of qs) {
+      const st = states.get(q.id)!;
+      expect(st.status).toBe(q.status);
+      expect(st.wording).toBe(wordingHash(q.item));
+      expect('item' in st).toBe(false);
+    }
+    await db.close();
+  });
   it('migrations apply once and are idempotent', async () => {
     const pool = new pg.Pool({ connectionString: url });
     await pool.query('DROP SCHEMA public CASCADE; CREATE SCHEMA public;');
