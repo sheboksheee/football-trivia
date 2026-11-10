@@ -5,3 +5,4 @@ export * from './ids.js';
 export * from './modes.js';
 export * from './protocol.js';
 export * from './content.js';
+export * from './lineupText.js';

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  parseLineupText,
+  formationPositions,
   ClientCommand,
   createRng,
   generateInviteCode,
@@ -134,5 +136,59 @@ describe('typo-tolerant, bilingual answer matching', () => {
     const entries = [{ n: 'Silva' }, { n: 'Silvo' }];
     expect(bestMatch('Silvu', entries, (e) => [e.n])).toBeNull();
     expect(bestMatch('Silva', entries, (e) => [e.n])).toEqual({ n: 'Silva' });
+  });
+});
+
+describe('pasted line-up parser', () => {
+  const list = [
+    '23 Emiliano Martínez',
+    '26 Nahuel Molina',
+    '13 Cristian Romero',
+    '19 Nicolás Otamendi',
+    '3 Nicolás Tagliafico',
+    '7 Rodrigo De Paul',
+    '24 Enzo Fernández',
+    '20 Alexis Mac Allister',
+    '10 Lionel Messi (c)',
+    '9 Julián Álvarez',
+    '11 Ángel Di María',
+  ].join('\n');
+  it('assigns positions from the formation and keeps shirt numbers', () => {
+    const r = parseLineupText(list, '4-4-2');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.players[0]).toEqual({ name: 'Emiliano Martínez', position: 'GK', shirt: 23 });
+    expect(r.players.map((p) => p.position).join('')).toBe('GKDFDFDFDFMFMFMFMFFWFW');
+    expect(r.players[8]).toEqual({ name: 'Lionel Messi', position: 'MF', shirt: 10 });
+  });
+  it('accepts Arabic names, bullets, trailing numbers and explicit positions', () => {
+    const ar = [
+      '• حارس محمد الشناوي 1',
+      'مدافع أحمد حجازي',
+      ...Array.from({ length: 9 }, (_, i) => `لاعب رقم${i} ${i + 2}`),
+    ].join('\n');
+    const r = parseLineupText(ar, '4-3-3');
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.players[0]).toEqual({ name: 'محمد الشناوي', position: 'GK', shirt: 1 });
+    expect(r.players[1]).toEqual({ name: 'أحمد حجازي', position: 'DF', shirt: null });
+    expect(r.players[10]!.position).toBe('FW');
+  });
+  it('rejects the wrong number of lines or a bad formation', () => {
+    expect(parseLineupText('a\nb', '4-3-3')).toEqual({ ok: false, error: 'Paste exactly 11 lines (got 2)' });
+    expect(parseLineupText(list, '4-4-3').ok).toBe(false);
+    expect(formationPositions('3-4-2-1')).toEqual([
+      'GK',
+      'DF',
+      'DF',
+      'DF',
+      'MF',
+      'MF',
+      'MF',
+      'MF',
+      'MF',
+      'MF',
+      'FW',
+    ]);
   });
 });

@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any -- admin API payloads */
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { parseLineupText } from '@ft/shared';
 import { Banner, Empty, Modal, Skeleton } from '../ui/common.js';
 
 const TOKEN_KEY = 'ft.adminToken';
@@ -840,6 +841,15 @@ function Lineups({ api }: { api: ReturnType<typeof useAdmin> }) {
     sourceUrl: '',
   });
   const [players, setPlayers] = useState(emptyPlayers);
+  const [paste, setPaste] = useState('');
+  const fillFromPaste = () => {
+    const r = parseLineupText(paste, form.formation);
+    if (!r.ok) return setMsg({ tone: 'bad', text: r.error });
+    setPlayers(
+      r.players.map((p) => ({ name: p.name, position: p.position, shirt: p.shirt ? String(p.shirt) : '' })),
+    );
+    setMsg({ tone: 'ok', text: 'Rows filled — check the positions below, then save.' });
+  };
   const [msg, setMsg] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null);
   const [busy, setBusy] = useState(false);
   const load = useCallback(() => {
@@ -877,6 +887,7 @@ function Lineups({ api }: { api: ReturnType<typeof useAdmin> }) {
         text: `Saved. ${r.questions.length} Missing XI questions created — approve them in Questions.`,
       });
       setPlayers(emptyPlayers());
+      setPaste('');
       setForm((f) => ({ ...f, match: '', team: '', sourceUrl: '' }));
       load();
     } catch (err) {
@@ -972,6 +983,29 @@ function Lineups({ api }: { api: ReturnType<typeof useAdmin> }) {
           onChange={set('sourceUrl')}
           required
         />
+        <div className="field">
+          <label className="label" htmlFor="paste">
+            Quick paste · الزق الأسامي (11 سطر: الحارس، الدفاع، الوسط، الهجوم)
+          </label>
+          <textarea
+            id="paste"
+            className="input"
+            dir="auto"
+            rows={6}
+            placeholder={'23 Emiliano Martínez\n26 Nahuel Molina\n…'}
+            value={paste}
+            onChange={(e) => setPaste(e.target.value)}
+          />
+          <button
+            type="button"
+            className="btn sm"
+            style={{ alignSelf: 'flex-start' }}
+            onClick={fillFromPaste}
+            disabled={!paste.trim()}
+          >
+            Fill the 11 rows · املا الخانات
+          </button>
+        </div>
         <div className="stack" style={{ gap: 6 }}>
           {players.map((p, i) => (
             <div key={i} className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
