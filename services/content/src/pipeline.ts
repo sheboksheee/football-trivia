@@ -14,6 +14,13 @@ import {
 } from './providers/footballDataContent.js';
 import { generateWikidataCandidates, normalizeWikidata, type WdKB } from './providers/wikidata.js';
 import { crossCheckOpenFootball, type CrossCheckReport } from './providers/openFootball.js';
+import {
+  generateManualLineupCandidates,
+  manualIdPrefix,
+  normalizeManualLineups,
+  type ManualKB,
+} from './providers/manualLineups.js';
+import type { Candidate } from './generators/index.js';
 import type { RawSnapshot } from './model.js';
 import type { GateKB } from './gates.js';
 
@@ -37,6 +44,8 @@ export interface PipelineResult {
   wdKb: WdKB | null;
   /** OpenFootball cross-check of football-data.org scores. */
   crossCheck: CrossCheckReport | null;
+  /** Owner-entered line-ups (Missing XI). */
+  manualKb: ManualKB | null;
 }
 
 export interface PipelineInputs {
@@ -46,6 +55,8 @@ export interface PipelineInputs {
   wikidata?: RawSnapshot[];
   /** Stored OpenFootball snapshots (cross-check only). */
   openFootball?: RawSnapshot[];
+  /** Line-ups typed in by the owner in the Content Studio, each with a cited source. */
+  manualLineups?: RawSnapshot[];
   /** ISO date used to decide which seasons are complete. */
   today?: string;
 }
@@ -70,11 +81,8 @@ export function runPipeline(
   const crossCheck =
     fdKb && inputs.openFootball?.length ? crossCheckOpenFootball(fdKb, inputs.openFootball) : null;
   const wdKb = inputs.wikidata?.length ? normalizeWikidata(inputs.wikidata) : null;
-  const groups: Array<{
-    kb: GateKB;
-    candidates: ReturnType<typeof generateCandidates>;
-    idPrefix: (i: number, fp: string, kind: string) => string;
-  }> = [
+  let manualKb: ManualKB | null = null;
+  const groups: CandidateGroup[] = [
     { kb, candidates: generateCandidates(kb), idPrefix: (i, f, kind) => `q_${kind}_${f.slice(0, 12)}_${i}` },
   ];
   // Provider question ids depend only on the fact fingerprint, so human reviews survive re-ingestion.
@@ -84,6 +92,11 @@ export function runPipeline(
       candidates: generateFootballDataCandidates(fdKb, { today }),
       idPrefix: (_i, f) => `q_fd_${f.slice(0, 16)}`,
     });
+  if (inputs.manualLineups?.length) {
+    const mlKb = normalizeManualLineups(inputs.manualLineups);
+    manualKb = mlKb;
+    groups.push({ kb: mlKb, candidates: generateManualLineupCandidates(mlKb), idPrefix: manualIdPrefix });
+  }
   if (wdKb)
     groups.push({
       kb: wdKb,
@@ -92,70 +105,82 @@ export function runPipeline(
     });
   const seen = new Set<string>();
   const questions: Question[] = [];
-  for (const group of groups)
-    group.candidates.forEach((c, i) => {
-      const kb = group.kb;
-      const gates = runGates(c, kb, seen);
-      seen.add(c.fingerprint);
-      const sourceIds = [
-        ...new Set(c.factIds.map((id) => kb.factIndex.get(id)?.sourceId).filter((x): x is string => !!x)),
-      ];
-      const difficulty = estimateDifficulty(c.components);
-      const failure = primaryFailure(gates);
-      const highImpact = HIGH_IMPACT_KINDS.includes(c.kind);
-      const eligible = sourceIds.every((s) => sourceById(s)?.autoApproveEligible);
-      let status: Question['status'] = failure ?? 'NEEDS_REVIEW';
-      let note = failure ? `Gate failure: ${failure}` : 'All gates passed; awaiting human review';
-      if (
-        !failure &&
-        eligible &&
-        policy.autoApproveFixtures &&
-        (!highImpact || policy.autoApproveHighImpact)
-      ) {
-        status = 'PUBLISHED';
-        note = 'Auto-published: fictional fixture source under development policy';
-      }
-      const id = group.idPrefix(i, c.fingerprint, c.kind);
-      const attribution = sourceIds.map((s) => sourceById(s)?.attribution ?? s).join('; ');
-      const item = {
-        ...c.item,
-        meta: {
-          questionId: id,
-          version: 1,
-          difficulty: difficulty.tier,
-          difficultyStatus: difficulty.status,
-          attribution,
-          sourceIds,
-          evidenceIds: [...new Set(c.factIds.map((f) => kb.factIndex.get(f)?.evidenceId ?? ''))].slice(0, 50),
-        },
-      } as ContentItem;
-      questions.push({
-        id,
-        kind: c.kind,
-        modes: KIND_TO_MODES[c.kind],
+  for (const group of groups) questions.push(...gateCandidates(group, policy, at, seen));
+  return { bank: new QuestionBank(questions), kb, conflicts, fdKb, wdKb, crossCheck, manualKb };
+}
+
+export interface CandidateGroup {
+  kb: GateKB;
+  candidates: Candidate[];
+  idPrefix: (i: number, fp: string, kind: string) => string;
+}
+
+/** Runs every gate on a group of candidates and turns them into gated questions. */
+export function gateCandidates(
+  group: CandidateGroup,
+  policy: PublishPolicy,
+  at: string,
+  seen: Set<string>,
+): Question[] {
+  const kb = group.kb;
+  const out: Question[] = [];
+  group.candidates.forEach((c, i) => {
+    const gates = runGates(c, kb, seen);
+    seen.add(c.fingerprint);
+    const sourceIds = [
+      ...new Set(c.factIds.map((id) => kb.factIndex.get(id)?.sourceId).filter((x): x is string => !!x)),
+    ];
+    const difficulty = estimateDifficulty(c.components);
+    const failure = primaryFailure(gates);
+    const highImpact = HIGH_IMPACT_KINDS.includes(c.kind);
+    const eligible = sourceIds.every((s) => sourceById(s)?.autoApproveEligible);
+    let status: Question['status'] = failure ?? 'NEEDS_REVIEW';
+    let note = failure ? `Gate failure: ${failure}` : 'All gates passed; awaiting human review';
+    if (!failure && eligible && policy.autoApproveFixtures && (!highImpact || policy.autoApproveHighImpact)) {
+      status = 'PUBLISHED';
+      note = 'Auto-published: fictional fixture source under development policy';
+    }
+    const id = group.idPrefix(i, c.fingerprint, c.kind);
+    const attribution = sourceIds.map((s) => sourceById(s)?.attribution ?? s).join('; ');
+    const item = {
+      ...c.item,
+      meta: {
+        questionId: id,
         version: 1,
-        status,
-        template: c.template,
-        item,
-        factIds: c.factIds,
+        difficulty: difficulty.tier,
+        difficultyStatus: difficulty.status,
+        attribution,
         sourceIds,
-        fingerprint: c.fingerprint,
-        highImpact,
-        gates,
-        difficulty,
-        createdAt: at,
-        audit: [
-          {
-            at,
-            actor: 'pipeline',
-            action: 'generated',
-            fromStatus: null,
-            toStatus: 'CANDIDATE',
-            note: c.template,
-          },
-          { at, actor: 'pipeline', action: 'gated', fromStatus: 'CANDIDATE', toStatus: status, note },
-        ],
-      });
+        evidenceIds: [...new Set(c.factIds.map((f) => kb.factIndex.get(f)?.evidenceId ?? ''))].slice(0, 50),
+      },
+    } as ContentItem;
+    out.push({
+      id,
+      kind: c.kind,
+      modes: KIND_TO_MODES[c.kind],
+      version: 1,
+      status,
+      template: c.template,
+      item,
+      factIds: c.factIds,
+      sourceIds,
+      fingerprint: c.fingerprint,
+      highImpact,
+      gates,
+      difficulty,
+      createdAt: at,
+      audit: [
+        {
+          at,
+          actor: 'pipeline',
+          action: 'generated',
+          fromStatus: null,
+          toStatus: 'CANDIDATE',
+          note: c.template,
+        },
+        { at, actor: 'pipeline', action: 'gated', fromStatus: 'CANDIDATE', toStatus: status, note },
+      ],
     });
-  return { bank: new QuestionBank(questions), kb, conflicts, fdKb, wdKb, crossCheck };
+  });
+  return out;
 }

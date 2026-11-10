@@ -6,6 +6,7 @@ export const PENDING_SOURCE_ID = 'src_synthetic_pending_rights';
 export const FOOTBALL_DATA_SOURCE_ID = 'src_football_data_org';
 export const WIKIDATA_SOURCE_ID = 'src_wikidata';
 export const OPENFOOTBALL_SOURCE_ID = 'src_openfootball';
+export const MANUAL_LINEUPS_SOURCE_ID = 'src_owner_lineups';
 
 /**
  * Source registry. Real-world providers are listed as CANDIDATES only (docs/DATA_SOURCES.md):
@@ -91,6 +92,20 @@ export const SOURCES: SourceRecord[] = [
     integrated: true,
     notes:
       'Public domain (CC0 1.0, LICENSE.md verified 2026-11-09). Used only to corroborate football-data.org full-time scores: a disagreement quarantines the affected questions.',
+  },
+  {
+    id: MANUAL_LINEUPS_SOURCE_ID,
+    name: 'Owner-entered line-ups (Content Studio)',
+    kind: 'OFFICIAL_REFERENCE',
+    // Starts PENDING like every source: the owner records the decision once.
+    licenseStatus: 'PENDING',
+    allowedUses: [],
+    attribution: 'Line-up entered by the organiser from the cited official match page',
+    termsUrl: null,
+    autoApproveEligible: false,
+    integrated: true,
+    notes:
+      'Kick-off XIs typed in by the owner, each with a required https source link (e.g. the official match centre). Every generated question needs human review.',
   },
   ...(
     [

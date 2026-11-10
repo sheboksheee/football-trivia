@@ -28,8 +28,12 @@ Verified on the official site and docs (not assumed):
 - **Live run (2026-11-09):** 11 completed league seasons, 3,532 matches compared, 3,532 agree, 0 conflicts, 0 unmatched names. Current-season files (2025-26, 2026-27) fail validation (unplayed matches in a different shape) and are skipped; they are not used for questions anyway.
 - Implementation: `services/content/src/providers/openFootball.ts`.
 
-## Next free source (planned): StatsBomb Open Data
-- Event data incl. line-ups for selected competitions (Missing XI). Its user agreement must be checked first; likely non-commercial → **private testing only**.
+## StatsBomb Open Data — not usable for the game (checked 2026-11-10)
+- Its Public Data User Agreement (LICENSE.pdf in the repository) says the user may not "distribute, reproduce, sell or in any way provide the data to any external or third party" nor "commercially exploit" it. Showing line-ups to players would do exactly that, so it is not integrated.
+
+## Integrated: owner-entered line-ups (2026-11-10)
+- Content Studio → Line-ups: the owner types a kick-off XI (match, date, competition, team, formation, 11 starters with positions and optional shirt numbers) and a required https link to the official page it came from. Validation: 11 different names, exactly one goalkeeper, formation adds up to 10, date not in the future.
+- Each line-up is an immutable snapshot (deleting writes an audited tombstone); up to 4 Missing XI questions per line-up, each hiding a different outfield player; hints = position, then shirt number (or initial). Source starts PENDING; questions need review.
 
 These are **candidates**, not confirmed licensed integrations. Verify coverage, terms, API limits, commercial redistribution rights and current availability before implementing.
 

@@ -11,7 +11,7 @@ import { footballDataSettings, type Config } from './config.js';
 import { createLogger, type Logger } from './logger.js';
 import { Metrics } from './metrics.js';
 import { MemoryPersistence, PostgresPersistence, type Persistence } from './persistence.js';
-import { ContentService } from './contentService.js';
+import { ContentService, LineupError } from './contentService.js';
 import { RoomManager, type Conn } from './roomManager.js';
 import { TokenBucket } from './rateLimit.js';
 
@@ -255,6 +255,30 @@ export async function createApp(
       }
       if (path === '/api/admin/open-data/cross-check')
         return json(res, 200, { crossCheck: content.result.crossCheck });
+      if (path === '/api/admin/lineups' && req.method === 'GET')
+        return json(res, 200, { lineups: content.lineups() });
+      if (path === '/api/admin/lineups' && req.method === 'POST') {
+        const body = (await readBody(req).catch(() => null)) as { reviewer?: unknown } | null;
+        const by =
+          typeof body?.reviewer === 'string' && body.reviewer.trim()
+            ? body.reviewer.trim().slice(0, 64)
+            : 'admin';
+        try {
+          return json(res, 201, await content.addLineup(body, by));
+        } catch (e) {
+          if (e instanceof LineupError) return json(res, 400, { error: e.message });
+          throw e;
+        }
+      }
+      const lu = /^\/api\/admin\/lineups\/([0-9a-f]{16})$/.exec(path);
+      if (lu && req.method === 'DELETE') {
+        try {
+          return json(res, 200, await content.deleteLineup(lu[1]!, 'admin'));
+        } catch (e) {
+          if (e instanceof LineupError) return json(res, 404, { error: e.message });
+          throw e;
+        }
+      }
       if (path === '/api/admin/questions/bulk-review' && req.method === 'POST') {
         const body = BulkBody.safeParse(await readBody(req).catch(() => null));
         if (!body.success) return json(res, 400, { error: body.error.issues[0]?.message ?? 'Invalid body' });
@@ -305,11 +329,13 @@ export async function createApp(
             const f =
               content.result.kb.factIndex.get(id) ??
               content.result.fdKb?.factIndex.get(id) ??
-              content.result.wdKb?.factIndex.get(id);
+              content.result.wdKb?.factIndex.get(id) ??
+              content.result.manualKb?.factIndex.get(id);
             const snap = f
               ? (content.result.kb.snapshots.get(f.evidenceId) ??
                 content.result.fdKb?.snapshots.get(f.evidenceId) ??
-                content.result.wdKb?.snapshots.get(f.evidenceId))
+                content.result.wdKb?.snapshots.get(f.evidenceId) ??
+                content.result.manualKb?.snapshots.get(f.evidenceId))
               : undefined;
             return f
               ? {

@@ -6,6 +6,15 @@ import {
   OPENFOOTBALL_SOURCE_ID,
   WIKIDATA_SOURCE_ID,
   WikidataClient,
+  MANUAL_LINEUPS_SOURCE_ID,
+  LineupEntry,
+  lineupId,
+  lineupSnapshot,
+  lineupDeletion,
+  normalizeManualLineups,
+  generateManualLineupCandidates,
+  gateCandidates,
+  manualIdPrefix,
   ingestOpenFootball,
   ingestWikidata,
   fixtureSnapshots,
@@ -89,6 +98,8 @@ export interface IngestStatus {
   seasons: number[];
 }
 
+export class LineupError extends Error {}
+
 export class ContentService {
   bank!: QuestionBank;
   result!: PipelineResult;
@@ -97,6 +108,7 @@ export class ContentService {
   private fdSnapshots: RawSnapshot[] = [];
   private wdSnapshots: RawSnapshot[] = [];
   private ofSnapshots: RawSnapshot[] = [];
+  private mlSnapshots: RawSnapshot[] = [];
   private ingest: IngestStatus;
   private open: { running: boolean; lastRunAt: string | null; lastReport: OpenDataStatus['lastReport'] } = {
     running: false,
@@ -126,6 +138,7 @@ export class ContentService {
     this.fdSnapshots = await this.db.loadSnapshots(FOOTBALL_DATA_SOURCE_ID);
     this.wdSnapshots = await this.db.loadSnapshots(WIKIDATA_SOURCE_ID);
     this.ofSnapshots = await this.db.loadSnapshots(OPENFOOTBALL_SOURCE_ID);
+    this.mlSnapshots = await this.db.loadSnapshots(MANUAL_LINEUPS_SOURCE_ID);
     await this.rebuild();
     this.ready = true;
     await this.db.saveSources(SOURCES);
@@ -142,6 +155,7 @@ export class ContentService {
       footballData: this.fdSnapshots,
       wikidata: this.wdSnapshots,
       openFootball: this.ofSnapshots,
+      manualLineups: this.mlSnapshots,
     });
     const bank = this.result.bank;
     const stored = await this.db.loadQuestions();
@@ -470,6 +484,83 @@ export class ContentService {
         this.open.lastRunAt = new Date().toISOString();
       });
     return this.openDataStatus();
+  }
+
+  /** Owner-entered line-ups with how many of their questions are in each status. */
+  lineups() {
+    const kb = this.result.manualKb;
+    if (!kb) return [];
+    return kb.lineups.map((l) => {
+      const qs = this.bank.all().filter((q) => q.factIds.some((f) => l.factIds.includes(f)));
+      const counts: Record<string, number> = {};
+      for (const q of qs) counts[q.status] = (counts[q.status] ?? 0) + 1;
+      return { id: l.id, ...l.entry, enteredBy: l.enteredBy, enteredAt: l.enteredAt, questions: counts };
+    });
+  }
+
+  /**
+   * Saves one line-up and generates its Missing XI questions immediately (no full rebuild: that
+   * takes minutes on small hosts). Questions wait for review like everything else.
+   */
+  async addLineup(raw: unknown, by: string) {
+    const parsed = LineupEntry.safeParse(raw);
+    if (!parsed.success) throw new LineupError(parsed.error.issues[0]?.message ?? 'Invalid line-up');
+    const id = lineupId(parsed.data);
+    if (this.result.manualKb?.lineups.some((l) => l.id === id))
+      throw new LineupError('This line-up is already saved (delete it first to re-enter it)');
+    const snap = lineupSnapshot(parsed.data, by);
+    await this.db.saveSnapshots([snap]);
+    this.mlSnapshots = [...this.mlSnapshots.filter((x) => x.id !== snap.id), snap];
+    const kb = normalizeManualLineups(this.mlSnapshots);
+    this.result = { ...this.result, manualKb: kb };
+    const seen = new Set(
+      this.bank
+        .all()
+        .filter((q) => q.status !== 'RETIRED')
+        .map((q) => q.fingerprint),
+    );
+    const qs = gateCandidates(
+      { kb, candidates: generateManualLineupCandidates(kb, { only: id }), idPrefix: manualIdPrefix },
+      this.o.strict ? STRICT_POLICY : DEV_POLICY,
+      new Date().toISOString(),
+      seen,
+    );
+    for (const q of qs) this.bank.upsert(q);
+    await this.db.saveQuestions(qs);
+    this.log.info({ lineupId: id, by, questions: qs.length }, 'line-up added');
+    return { id, questions: qs.map((q) => ({ id: q.id, status: q.status })) };
+  }
+
+  /** Removes a line-up (an audited tombstone; the original snapshot stays) and retires its questions. */
+  async deleteLineup(id: string, by: string) {
+    const l = this.result.manualKb?.lineups.find((x) => x.id === id);
+    if (!l) throw new LineupError('Line-up not found');
+    const snap = lineupDeletion(id, l.enteredAt, by);
+    await this.db.saveSnapshots([snap]);
+    this.mlSnapshots = [...this.mlSnapshots, snap];
+    const at = new Date().toISOString();
+    const retired = this.bank
+      .all()
+      .filter((q) => q.status !== 'RETIRED' && q.factIds.some((f) => l.factIds.includes(f)))
+      .map((q) => ({
+        ...q,
+        status: 'RETIRED' as const,
+        audit: [
+          ...q.audit,
+          {
+            at,
+            actor: by,
+            action: 'line-up deleted',
+            fromStatus: q.status,
+            toStatus: 'RETIRED' as const,
+            note: id,
+          },
+        ],
+      }));
+    for (const q of retired) this.bank.upsert(q);
+    await this.db.saveQuestions(retired);
+    this.result = { ...this.result, manualKb: normalizeManualLineups(this.mlSnapshots) };
+    return { retired: retired.length };
   }
 
   /** Test helper: resolves when the open-data run has finished. */

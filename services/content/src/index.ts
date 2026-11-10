@@ -14,3 +14,4 @@ export * from './providers/footballData.js';
 export * from './providers/footballDataContent.js';
 export * from './providers/wikidata.js';
 export * from './providers/openFootball.js';
+export * from './providers/manualLineups.js';

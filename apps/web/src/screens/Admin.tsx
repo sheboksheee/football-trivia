@@ -64,7 +64,7 @@ export function Admin() {
   const [authErr, setAuthErr] = useState<string | null>(null);
   const api = useAdmin(token);
   const [summary, setSummary] = useState<any>(null);
-  const [tab, setTab] = useState<'queue' | 'sources' | 'conflicts'>('queue');
+  const [tab, setTab] = useState<'queue' | 'lineups' | 'sources' | 'conflicts'>('queue');
 
   useEffect(() => {
     if (!token) return;
@@ -144,7 +144,7 @@ export function Admin() {
       </Banner>
       {summary ? <Summary counts={summary.counts} conflicts={summary.conflicts} /> : <Skeleton h={90} />}
       <div className="seg" role="tablist" style={{ maxWidth: 520 }}>
-        {(['queue', 'sources', 'conflicts'] as const).map((k) => (
+        {(['queue', 'lineups', 'sources', 'conflicts'] as const).map((k) => (
           <button
             key={k}
             role="tab"
@@ -152,11 +152,18 @@ export function Admin() {
             aria-selected={tab === k}
             onClick={() => setTab(k)}
           >
-            {k === 'queue' ? 'Questions' : k === 'sources' ? 'Sources & rights' : 'Conflicts'}
+            {k === 'queue'
+              ? 'Questions'
+              : k === 'lineups'
+                ? 'Line-ups · تشكيلات'
+                : k === 'sources'
+                  ? 'Sources & rights'
+                  : 'Conflicts'}
           </button>
         ))}
       </div>
       {tab === 'queue' && <Queue api={api} onChange={() => api('/summary').then(setSummary)} />}
+      {tab === 'lineups' && <Lineups api={api} />}
       {tab === 'sources' && <Sources api={api} />}
       {tab === 'conflicts' && <Conflicts api={api} />}
     </div>
@@ -812,6 +819,239 @@ function OpenDataPanel({
       ))}
       {msg && <span className="small muted">{msg}</span>}
     </section>
+  );
+}
+
+const DEFAULT_POS = ['GK', 'DF', 'DF', 'DF', 'DF', 'MF', 'MF', 'MF', 'FW', 'FW', 'FW'] as const;
+type Pos = 'GK' | 'DF' | 'MF' | 'FW';
+const emptyPlayers = () =>
+  DEFAULT_POS.map((position) => ({ name: '', position: position as Pos, shirt: '' }));
+
+/** Owner-entered kick-off XIs for “Missing XI” (no free provider may redistribute line-ups). */
+function Lineups({ api }: { api: ReturnType<typeof useAdmin> }) {
+  const [list, setList] = useState<any[] | null>(null);
+  const [source, setSource] = useState<any>(null);
+  const [form, setForm] = useState({
+    match: '',
+    date: '',
+    competition: '',
+    team: '',
+    formation: '4-3-3',
+    sourceUrl: '',
+  });
+  const [players, setPlayers] = useState(emptyPlayers);
+  const [msg, setMsg] = useState<{ tone: 'ok' | 'bad'; text: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const load = useCallback(() => {
+    api('/lineups')
+      .then((r) => setList(r.lineups))
+      .catch(() => setList([]));
+    api('/sources')
+      .then((r) => setSource(r.sources.find((x: any) => x.id === 'src_owner_lineups')))
+      .catch(() => undefined);
+  }, [api]);
+  useEffect(load, [load]);
+  const set = (k: keyof typeof form) => (e: { target: { value: string } }) =>
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+  const setP = (i: number, k: 'name' | 'position' | 'shirt', v: string) =>
+    setPlayers((ps) => ps.map((p, j) => (j === i ? { ...p, [k]: v } : p)));
+  const save = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setMsg(null);
+    try {
+      const r = await api('/lineups', {
+        method: 'POST',
+        body: JSON.stringify({
+          ...form,
+          players: players.map((p) => ({
+            name: p.name.trim(),
+            position: p.position,
+            shirt: p.shirt ? Number(p.shirt) : null,
+            aliases: [],
+          })),
+        }),
+      });
+      setMsg({
+        tone: 'ok',
+        text: `Saved. ${r.questions.length} Missing XI questions created — approve them in Questions.`,
+      });
+      setPlayers(emptyPlayers());
+      setForm((f) => ({ ...f, match: '', team: '', sourceUrl: '' }));
+      load();
+    } catch (err) {
+      setMsg({ tone: 'bad', text: (err as Error).message });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = async (id: string) => {
+    if (!confirm('Delete this line-up and retire its questions?')) return;
+    await api(`/lineups/${id}`, { method: 'DELETE' }).catch((e) => setMsg({ tone: 'bad', text: e.message }));
+    load();
+  };
+  const approveSource = async () => {
+    await api('/sources/src_owner_lineups/license', {
+      method: 'POST',
+      body: JSON.stringify({
+        status: 'APPROVED',
+        allowedUses: ['GAMEPLAY'],
+        note: 'Owner-entered line-ups from cited official match pages',
+      }),
+    }).catch((e) => setMsg({ tone: 'bad', text: e.message }));
+    load();
+  };
+  return (
+    <div className="stack">
+      {source && source.licenseStatus !== 'APPROVED' && (
+        <Banner tone="warn">
+          Line-up questions stay blocked until you allow this source once.{' '}
+          <button className="btn sm" onClick={approveSource}>
+            Allow for gameplay
+          </button>
+        </Banner>
+      )}
+      <form className="card stack" onSubmit={save}>
+        <h2 className="display h3" style={{ margin: 0 }}>
+          Add a kick-off line-up · ضيف تشكيلة
+        </h2>
+        <p className="small muted" style={{ margin: 0 }}>
+          Copy the 11 starters from an official match page (e.g. FIFA, UEFA or the league’s match centre) and
+          paste its link. Each line-up creates up to 4 “Missing XI” questions, each hiding a different
+          outfield player.
+        </p>
+        <div className="row" style={{ flexWrap: 'wrap' }}>
+          <input
+            className="input"
+            style={{ flex: 2, minWidth: 220 }}
+            placeholder="Match, e.g. نهائي كاس العالم 2022: الأرجنتين 3–3 فرنسا"
+            value={form.match}
+            onChange={set('match')}
+            required
+          />
+          <input
+            className="input"
+            style={{ flex: 1, minWidth: 140 }}
+            type="date"
+            value={form.date}
+            onChange={set('date')}
+            required
+          />
+        </div>
+        <div className="row" style={{ flexWrap: 'wrap' }}>
+          <input
+            className="input"
+            style={{ flex: 1, minWidth: 160 }}
+            placeholder="Competition, e.g. كاس العالم"
+            value={form.competition}
+            onChange={set('competition')}
+            required
+          />
+          <input
+            className="input"
+            style={{ flex: 1, minWidth: 160 }}
+            placeholder="Team, e.g. الأرجنتين"
+            value={form.team}
+            onChange={set('team')}
+            required
+          />
+          <input
+            className="input"
+            style={{ width: 110 }}
+            placeholder="4-3-3"
+            value={form.formation}
+            onChange={set('formation')}
+            required
+          />
+        </div>
+        <input
+          className="input"
+          type="url"
+          placeholder="Source link (https://…)"
+          value={form.sourceUrl}
+          onChange={set('sourceUrl')}
+          required
+        />
+        <div className="stack" style={{ gap: 6 }}>
+          {players.map((p, i) => (
+            <div key={i} className="row" style={{ gap: 6, flexWrap: 'nowrap' }}>
+              <span className="num muted" style={{ width: 22 }}>
+                {i + 1}
+              </span>
+              <select
+                className="input"
+                style={{ width: 96, flex: 'none' }}
+                value={p.position}
+                onChange={(e) => setP(i, 'position', e.target.value)}
+                aria-label={`Position ${i + 1}`}
+              >
+                <option value="GK">حارس</option>
+                <option value="DF">دفاع</option>
+                <option value="MF">وسط</option>
+                <option value="FW">هجوم</option>
+              </select>
+              <input
+                className="input"
+                style={{ flex: 1, minWidth: 0 }}
+                dir="auto"
+                placeholder="Player name"
+                value={p.name}
+                onChange={(e) => setP(i, 'name', e.target.value)}
+                required
+                aria-label={`Player ${i + 1}`}
+              />
+              <input
+                className="input"
+                style={{ width: 52, flex: 'none' }}
+                inputMode="numeric"
+                placeholder="#"
+                value={p.shirt}
+                onChange={(e) => setP(i, 'shirt', e.target.value.replace(/\D/g, '').slice(0, 2))}
+                aria-label={`Shirt ${i + 1}`}
+              />
+            </div>
+          ))}
+        </div>
+        {msg && <Banner tone={msg.tone}>{msg.text}</Banner>}
+        <button className="btn primary" disabled={busy}>
+          {busy ? 'Saving…' : 'Save line-up'}
+        </button>
+      </form>
+      <section className="card stack">
+        <h2 className="display h3" style={{ margin: 0 }}>
+          Saved line-ups ({list?.length ?? 0})
+        </h2>
+        {!list ? (
+          <Skeleton h={80} />
+        ) : list.length === 0 ? (
+          <p className="muted small" style={{ margin: 0 }}>
+            None yet.
+          </p>
+        ) : (
+          <ul className="list">
+            {list.map((l) => (
+              <li key={l.id} className="list-item">
+                <span className="grow" dir="auto">
+                  <strong>{l.match}</strong> · {l.team} · {l.date}
+                  <div className="small muted">
+                    {Object.entries(l.questions)
+                      .map(([k, v]) => `${k}: ${v}`)
+                      .join(' · ')}{' '}
+                    ·{' '}
+                    <a href={l.sourceUrl} target="_blank" rel="noreferrer noopener">
+                      source
+                    </a>
+                  </div>
+                </span>
+                <button className="btn sm danger" onClick={() => remove(l.id)}>
+                  Delete
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+    </div>
   );
 }
 
